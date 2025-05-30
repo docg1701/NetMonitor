@@ -42,21 +42,20 @@ else
 fi
 
 # 3. Install/update dependencies using the virtual environment's pip
-#    First, check if the requirements.txt file exists
-if [ ! -f "$REQUIREMENTS_FILE_PATH" ]; then
-    echo "ERROR: File '$REQUIREMENTS_FILE' not found in '$SCRIPT_DIR'."
-    exit 1
+if [ -s "$REQUIREMENTS_FILE_PATH" ]; then
+    echo "INFO: Installing/updating dependencies from '$REQUIREMENTS_FILE' in the virtual environment..."
+    # "$@" passes all command-line arguments received by run_monitor.sh to pip install
+    # (though unlikely to be used by pip here) and more importantly,
+    # to the python script later.
+    "$PIP_EXEC" install --disable-pip-version-check --no-cache-dir -r "$REQUIREMENTS_FILE_PATH"
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to install dependencies. Check '$REQUIREMENTS_FILE' and your internet connection."
+        exit 1
+    fi
+    echo "INFO: Dependencies installed/updated successfully."
+else
+    echo "INFO: '$REQUIREMENTS_FILE' is empty or not found in '$SCRIPT_DIR', skipping dependency installation."
 fi
-
-echo "INFO: Installing/updating dependencies from '$REQUIREMENTS_FILE' in the virtual environment..."
-# "$@" passes all command-line arguments received by run_monitor.sh to pip install (though unlikely to be used by pip here)
-# and more importantly, to the python script later.
-"$PIP_EXEC" install --disable-pip-version-check --no-cache-dir -r "$REQUIREMENTS_FILE_PATH"
-if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to install dependencies. Check '$REQUIREMENTS_FILE' and your internet connection."
-    exit 1
-fi
-echo "INFO: Dependencies installed/updated successfully."
 
 # 4. Execute the Python script using the virtual environment's Python interpreter
 #    First, check if the Python script itself exists
