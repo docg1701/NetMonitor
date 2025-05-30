@@ -7,6 +7,7 @@ import sys
 import argparse
 import termios  # POSIX-specific module for terminal I/O control
 import logging
+import platform # For OS detection
 
 # --- ANSI Escape Codes ---
 ANSI_CURSOR_HOME = "\033[H"
@@ -75,6 +76,7 @@ class NetworkMonitor:
         self.connection_status_message: str = ""
         self.total_monitoring_time_seconds: float = 0.0
         self.original_terminal_settings = None
+        self.current_os: str = "" # Will be set in __init__
 
         # Setup logger
         logger_name = f"{__name__}.{self.__class__.__name__}"
@@ -91,9 +93,42 @@ class NetworkMonitor:
             self.logger.addHandler(handler)
         self.logger.propagate = False
 
+        # Determine and store OS type
+        self.current_os = platform.system().lower()
+        self.logger.info(f"Detected OS: {self.current_os}")
+
+        # Platform-specific ping command attributes
+        self.ping_cmd_parts: list[str] = []
+        self.ping_regex: re.Pattern[str]
+        self.ping_timeout_is_ms: bool = False
+
+        if self.current_os == "windows":
+            # For Windows: ping -n 1 -w <timeout_ms> <host>
+            # Timeout is in milliseconds.
+            self.ping_cmd_parts = ["ping", "-n", "1", "-w"]
+            # Regex for Windows might be like: "Average = Xms", or "Minimum = Xms, Maximum = Yms, Average = Zms"
+            # A common pattern for individual time is "time=XXms" or "Reply from ... time<XXms"
+            # This regex aims for "time=Xms" or "time<Xms" or "Time: Xms" etc.
+            self.ping_regex = re.compile(r"time(?:<|=)(\d+)\s*ms", re.IGNORECASE)
+            self.ping_timeout_is_ms = True
+        elif self.current_os == "darwin":  # macOS
+            # For macOS: ping -c 1 -t <timeout_s> <host>
+            # Timeout is in seconds.
+            self.ping_cmd_parts = ["ping", "-c", "1", "-t"]
+            self.ping_regex = re.compile(r"time=([0-9\.]+)\s*ms", re.IGNORECASE)
+            self.ping_timeout_is_ms = False
+        else:  # Default to Linux
+            # For Linux: ping -c 1 -W <timeout_s> <host>
+            # Timeout is in seconds (-W for Linux, -t for macOS uses same unit)
+            self.ping_cmd_parts = ["ping", "-c", "1", "-W"]
+            self.ping_regex = re.compile(r"time=([0-9\.]+)\s*ms", re.IGNORECASE)
+            self.ping_timeout_is_ms = False
+
+
     def _measure_latency(self) -> float | None:
         """
-        Measures latency to the configured host using the system's ping command.
+        Measures latency to the configured host using the system's ping command,
+        adapting command and output parsing based on the detected OS.
 
         Returns:
             float | None: Latency in milliseconds (ms) if successful,
@@ -102,15 +137,26 @@ class NetworkMonitor:
         Raises:
             FileNotFoundError: If the 'ping' command is not found.
         """
-        ping_timeout_val = str(max(PING_MIN_TIMEOUT_S, int(self.ping_interval)))
-        # Ensure subprocess timeout is slightly larger than ping's own timeout
+        if self.ping_timeout_is_ms:
+            # Windows expects timeout in milliseconds
+            timeout_val_for_cmd = str(
+                max(int(PING_MIN_TIMEOUT_S * 1000), int(self.ping_interval * 1000))
+            )
+        else:
+            # Linux/macOS expect timeout in seconds
+            timeout_val_for_cmd = str(
+                max(PING_MIN_TIMEOUT_S, int(self.ping_interval))
+            )
+
+        # Ensure subprocess timeout is always in seconds and slightly larger
         subprocess_timeout = max(
             SUBPROCESS_MIN_TIMEOUT_S_BASE,
             self.ping_interval + SUBPROCESS_TIMEOUT_S_ADDITIVE,
         )
 
+        command = self.ping_cmd_parts + [timeout_val_for_cmd, self.host]
+
         try:
-            command = ["ping", "-c", "1", "-W", ping_timeout_val, self.host]
             proc = subprocess.run(
                 command,
                 capture_output=True,
@@ -120,11 +166,13 @@ class NetworkMonitor:
             )
             if proc.returncode == 0:  # Successful ping
                 output = proc.stdout
-                # Regex to find 'time=...' in ping output
-                match = re.search(r"time=([0-9\.]+)\s*ms", output, re.IGNORECASE)
+                match = self.ping_regex.search(output)
                 if match:
+                    # Group 1 should be the latency value
                     return float(match.group(1))
-                self.logger.warning("Ping successful but no time found in output.")
+                self.logger.warning(
+                    f"Ping to {self.host} successful, but regex did not find time in output."
+                )
                 return None  # Should be unlikely for standard ping
             else:  # Ping command failed (e.g., host unknown, timeout)
                 self.logger.debug(
