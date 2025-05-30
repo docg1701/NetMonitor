@@ -524,24 +524,28 @@ class NetworkMonitor:
         self._display_statistics()
 
     def _setup_terminal(self):
-        """Hides the cursor and saves original terminal settings."""
+        """Hides the cursor and saves original terminal settings (if not on Windows)."""
         sys.stdout.write(ANSI_HIDE_CURSOR)
         sys.stdout.flush()
-        try:
-            # termios module is POSIX-specific
-            self.original_terminal_settings = termios.tcgetattr(sys.stdin.fileno())
-        except Exception as e:  # pylint: disable=broad-except
-            # If not in a real terminal (e.g. piped output), tcgetattr can fail.
-            self.logger.warning(
-                f"Could not get terminal settings: {e}. Terminal restoration might not work."
-            )
-            self.original_terminal_settings = None
+        if self.current_os != "windows":
+            try:
+                # termios module is POSIX-specific
+                self.original_terminal_settings = termios.tcgetattr(sys.stdin.fileno())
+            except Exception as e:  # pylint: disable=broad-except
+                # If not in a real terminal (e.g. piped output), tcgetattr can fail.
+                self.logger.warning(
+                    f"Could not get termios settings: {e}. Terminal restoration might not work."
+                )
+                self.original_terminal_settings = None
+        else:
+            self.logger.info("Skipping termios-based terminal settings capture on Windows.")
+            self.original_terminal_settings = None # Ensure it's None on Windows
 
     def _restore_terminal(self):
-        """Restores the cursor and original terminal settings."""
+        """Restores the cursor and original terminal settings (if not on Windows and settings were saved)."""
         sys.stdout.write(ANSI_SHOW_CURSOR)
         sys.stdout.flush()
-        if self.original_terminal_settings:
+        if self.current_os != "windows" and self.original_terminal_settings is not None:
             try:
                 termios.tcsetattr(
                     sys.stdin.fileno(),
@@ -549,7 +553,10 @@ class NetworkMonitor:
                     self.original_terminal_settings,
                 )
             except Exception as e:  # pylint: disable=broad-except
-                self.logger.warning(f"Could not restore terminal settings: {e}.")
+                self.logger.warning(f"Could not restore termios settings: {e}.")
+        elif self.current_os == "windows":
+            self.logger.info("Skipping termios-based terminal settings restoration on Windows.")
+
 
     def run(self):
         """Runs the main monitoring loop."""

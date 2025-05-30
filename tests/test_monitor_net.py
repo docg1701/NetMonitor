@@ -5,8 +5,9 @@ import argparse
 from unittest.mock import MagicMock, call
 import sys
 import os
-import time # For mocking time.sleep
-# import platform as pf # Not needed here, mocked in fixture
+import time
+# Import real termios for termios.TCSADRAIN constant
+import termios as real_termios
 
 # Add the parent directory to sys.path to allow direct import of monitor_net
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -14,7 +15,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from monitor_net import (
     NetworkMonitor, DEFAULT_HOST_ARG,
     DEFAULT_PING_INTERVAL_SECONDS_ARG, DEFAULT_GRAPH_Y_MAX_ARG,
-    DEFAULT_Y_TICKS_ARG, main, EXIT_CODE_ERROR, PING_MIN_TIMEOUT_S
+    DEFAULT_Y_TICKS_ARG, main, EXIT_CODE_ERROR, PING_MIN_TIMEOUT_S,
+    ANSI_HIDE_CURSOR, ANSI_SHOW_CURSOR
 )
 
 # Custom exception to break the run loop in tests
@@ -34,10 +36,11 @@ def mock_default_args(mocker):
 @pytest.fixture
 def monitor_instance_base(mock_default_args, mocker):
     """Basic NetworkMonitor instance with a fully mocked logger for most tests."""
-    monitor = NetworkMonitor(mock_default_args)
-    # Replace the real logger with a MagicMock that has mock methods
+    # Default to Linux for non-OS-specific tests.
+    with mocker.patch('monitor_net.platform.system', return_value="Linux"):
+        monitor = NetworkMonitor(mock_default_args)
+
     monitor.logger = mocker.MagicMock(spec=logging.Logger)
-    # Ensure individual log methods are also mocks if not automatically by spec
     for level in ['info', 'warning', 'error', 'critical', 'exception', 'debug']:
         setattr(monitor.logger, level, mocker.MagicMock())
     return monitor
@@ -49,22 +52,19 @@ def monitor_instance_os(request, mocker, mock_default_args):
     different OS environments by mocking platform.system().
     """
     os_name_to_return = request.param
-    # Mock platform.system() *before* NetworkMonitor is instantiated
-    mocker.patch('monitor_net.platform.system', return_value=os_name_to_return) # Patch in monitor_net's context
+    with mocker.patch('monitor_net.platform.system', return_value=os_name_to_return):
+        monitor = NetworkMonitor(mock_default_args)
 
-    monitor = NetworkMonitor(mock_default_args)
-    # Replace the real logger with a MagicMock as in monitor_instance_base
     monitor.logger = mocker.MagicMock(spec=logging.Logger)
     for level in ['info', 'warning', 'error', 'critical', 'exception', 'debug']:
         setattr(monitor.logger, level, mocker.MagicMock())
-    # Store the os_name with the instance for easy access/assertion in tests
     monitor.TEST_OS_NAME = os_name_to_return.lower()
     return monitor
 
 # --- Tests for _measure_latency (OS-agnostic for some error cases) ---
 
 def test_measure_latency_subprocess_timeout(monitor_instance_base, mocker):
-    """Test subprocess.TimeoutExpired returns None (OS-agnostic part)."""
+    """Test subprocess.TimeoutExpired returns None."""
     mock_subprocess_run = mocker.patch(
         'subprocess.run',
         side_effect=subprocess.TimeoutExpired(cmd="ping", timeout=5)
@@ -77,7 +77,7 @@ def test_measure_latency_subprocess_timeout(monitor_instance_base, mocker):
     )
 
 def test_measure_latency_file_not_found(monitor_instance_base, mocker):
-    """Test FileNotFoundError for ping command re-raises (OS-agnostic part)."""
+    """Test FileNotFoundError for ping command re-raises."""
     mock_subprocess_run = mocker.patch(
         'subprocess.run',
         side_effect=FileNotFoundError("ping command not found")
@@ -309,7 +309,7 @@ def test_main_invalid_yticks(mocker):
 
 # --- Integration Test for run() method (using monitor_instance_base) ---
 
-class TestLoopIntegrationExit(Exception): # Defined for this test
+class TestLoopIntegrationExit(Exception):
     pass
 
 def test_network_monitor_run_loop_basic_iterations(monitor_instance_base, mocker):
@@ -350,7 +350,8 @@ def test_network_monitor_run_loop_basic_iterations(monitor_instance_base, mocker
     mock_sys_exit.assert_called_once_with(EXIT_CODE_ERROR)
     monitor_instance_base.logger.exception.assert_called_once()
 
-    print(f"DEBUG_AGENT: Captured exception details by logger: {logged_exception_details}")
+    # This print is for debugging in case the test fails.
+    # print(f"DEBUG_AGENT: Captured exception details by logger: {logged_exception_details}")
 
     assert len(logged_exception_details) == 1
     assert logged_exception_details[0]["msg"] == "An unexpected or critical error occurred in run loop"
@@ -372,3 +373,76 @@ def test_network_monitor_run_loop_basic_iterations(monitor_instance_base, mocker
 
     assert monitor_instance_base.latency_history_real_values == expected_history_real
     assert monitor_instance_base.latency_plot_values == expected_plot_values
+
+# --- Tests for OS-aware _setup_terminal and _restore_terminal ---
+
+@pytest.mark.parametrize("monitor_instance_os", ["Linux", "Darwin", "Windows"], indirect=True)
+def test_setup_terminal_os_awareness(monitor_instance_os, mocker):
+    mock_stdout_write = mocker.patch('sys.stdout.write')
+    mock_fileno = mocker.patch('sys.stdin.fileno', return_value=0)
+
+    mock_tcgetattr = None
+    if monitor_instance_os.TEST_OS_NAME != "windows":
+        mock_termios_module = mocker.patch('monitor_net.termios', spec=real_termios)
+        mock_tcgetattr = mock_termios_module.tcgetattr
+        mock_tcgetattr.return_value = "fake_settings"
+
+    monitor_instance_os._setup_terminal()
+
+    mock_stdout_write.assert_any_call(ANSI_HIDE_CURSOR)
+
+    if monitor_instance_os.TEST_OS_NAME != "windows":
+        assert mock_tcgetattr is not None
+        mock_tcgetattr.assert_called_once_with(0)
+        assert monitor_instance_os.original_terminal_settings == "fake_settings"
+        # Ensure the "Skipping..." log for Windows was NOT called
+        assert not any(
+            cargs[0][0] == "Skipping termios-based terminal settings capture on Windows."
+            for cargs in monitor_instance_os.logger.info.call_args_list
+        )
+    else:
+        if mock_tcgetattr:
+             mock_tcgetattr.assert_not_called()
+        assert monitor_instance_os.original_terminal_settings is None
+        monitor_instance_os.logger.info.assert_any_call(
+            "Skipping termios-based terminal settings capture on Windows."
+        )
+
+@pytest.mark.parametrize("monitor_instance_os", ["Linux", "Darwin", "Windows"], indirect=True)
+def test_restore_terminal_os_awareness(monitor_instance_os, mocker):
+    mock_stdout_write = mocker.patch('sys.stdout.write')
+    mock_fileno = mocker.patch('sys.stdin.fileno', return_value=0)
+
+    if monitor_instance_os.TEST_OS_NAME != "windows":
+        mock_termios_module = mocker.patch('monitor_net.termios', spec=real_termios)
+        mock_termios_module.TCSADRAIN = real_termios.TCSADRAIN
+        mock_tcsetattr = mock_termios_module.tcsetattr
+
+        # Scenario 1: Settings were saved
+        monitor_instance_os.original_terminal_settings = "fake_settings"
+        monitor_instance_os._restore_terminal()
+        mock_tcsetattr.assert_called_once_with(0, real_termios.TCSADRAIN, "fake_settings")
+
+        # Scenario 2: Settings were None
+        monitor_instance_os.original_terminal_settings = None
+        mock_tcsetattr.reset_mock()
+        monitor_instance_os._restore_terminal()
+        mock_tcsetattr.assert_not_called()
+        # Ensure the "Skipping..." log for Windows was NOT called
+        assert not any(
+            cargs[0][0] == "Skipping termios-based terminal settings restoration on Windows."
+            for cargs in monitor_instance_os.logger.info.call_args_list
+        )
+    else:
+        monitor_instance_os.original_terminal_settings = None
+        # Ensure tcsetattr is not called on Windows.
+        # We can mock it on monitor_net.termios if termios itself is importable,
+        # or rely on the fact that original_terminal_settings will be None.
+        mock_tcsetattr_win = mocker.patch('monitor_net.termios.tcsetattr', create=True, spec=True)
+        monitor_instance_os._restore_terminal()
+        mock_tcsetattr_win.assert_not_called()
+        monitor_instance_os.logger.info.assert_any_call(
+            "Skipping termios-based terminal settings restoration on Windows."
+        )
+
+    mock_stdout_write.assert_any_call(ANSI_SHOW_CURSOR)
