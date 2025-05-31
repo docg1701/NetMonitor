@@ -9,6 +9,10 @@ import termios  # POSIX-specific module for terminal I/O control
 import logging
 import platform  # For OS detection
 import configparser  # For reading configuration file
+import csv  # For CSV logging
+from datetime import datetime  # For timestamping CSV entries
+import socket # For resolving IP address for CSV logging
+# Note: 'os' is imported near the top of the file already
 
 # --- ANSI Escape Codes ---
 ANSI_CURSOR_HOME = "\033[H"
@@ -81,6 +85,10 @@ class NetworkMonitor:
         self.original_terminal_settings = None
         self.current_os: str = ""  # Will be set before logger
         self.config_file_settings: dict = {}  # For settings from INI file
+        self.output_file_path: str | None = None # For CSV logging
+        self.output_file_handle = None # File handle for CSV
+        self.csv_writer = None # CSV writer object
+        self.resolved_ip: str | None = None # Resolved IP of the host for logging
 
         # Determine OS type first, as it might influence other setups
         self.current_os = platform.system().lower()
@@ -169,6 +177,7 @@ class NetworkMonitor:
         final_interval = DEFAULT_PING_INTERVAL_SECONDS_ARG
         final_ymax = DEFAULT_GRAPH_Y_MAX_ARG
         final_yticks = DEFAULT_Y_TICKS_ARG
+        final_output_file = None # Default to no output file
 
         # 1. Apply Config File Settings (if they exist and are valid)
         cfg_host = self.config_file_settings.get("host")
@@ -203,6 +212,11 @@ class NetworkMonitor:
                 final_yticks = converted_yticks
                 self.logger.info(f"Using 'yticks' from config file: {final_yticks}")
 
+        cfg_output_file = self.config_file_settings.get("output_file")
+        if cfg_output_file is not None and cfg_output_file.strip(): # Ensure not empty string
+            final_output_file = cfg_output_file.strip()
+            self.logger.info(f"Using 'output_file' from config file: {final_output_file}")
+
         # 2. Apply CLI arguments (these override config and defaults if specified by user)
         # Check if CLI arg is different from its argparse-defined default.
         # If so, the user explicitly set it.
@@ -221,17 +235,28 @@ class NetworkMonitor:
             final_yticks = cli_args.yticks
             self.logger.info(f"CLI 'yticks' ({final_yticks}) overrides other settings.")
 
+        # For output_file, its argparse default is None.
+        # So, if cli_args.output_file is not None, the user specified it.
+        if cli_args.output_file is not None:
+            final_output_file = cli_args.output_file
+            self.logger.info(
+                f"CLI 'output_file' ({final_output_file}) overrides other settings."
+            )
+
         # Set the final effective settings on the instance
         self.host = final_host
         self.ping_interval = final_interval
         self.graph_y_max = final_ymax
         self.y_ticks = final_yticks
+        self.output_file_path = final_output_file
 
         # Log final effective settings
         self.logger.info(f"Effective host: {self.host}")
         self.logger.info(f"Effective interval: {self.ping_interval}s")
         self.logger.info(f"Effective graph Y-max: {self.graph_y_max}ms")
         self.logger.info(f"Effective Y-axis ticks: {self.y_ticks}")
+        self.logger.info(f"Effective output file: {self.output_file_path}")
+
 
         # Final validation of effective settings
         if self.ping_interval <= 0:
@@ -246,6 +271,47 @@ class NetworkMonitor:
             raise ValueError(
                 f"Effective number of Y-axis ticks ({self.y_ticks}) must be at least 2."
             )
+
+        # Setup CSV file logging if path is provided
+        if self.output_file_path:
+            self.logger.info(f"Logging ping data to CSV: {self.output_file_path}")
+            try:
+                self.resolved_ip = socket.gethostbyname(self.host)
+            except socket.gaierror:
+                self.logger.warning(
+                    f"Could not resolve IP for host '{self.host}'. "
+                    "IP field in CSV will be blank."
+                )
+                self.resolved_ip = "" # Use empty string for CSV if resolution fails
+
+            file_exists = os.path.exists(self.output_file_path)
+            is_empty_file = file_exists and os.path.getsize(self.output_file_path) == 0
+
+            try:
+                # Open in append mode, create if not exists
+                self.output_file_handle = open(
+                    self.output_file_path, 'a', newline='', encoding='utf-8'
+                )
+                self.csv_writer = csv.writer(self.output_file_handle)
+
+                if not file_exists or is_empty_file:
+                    # Write header only if file is new or was empty
+                    self.csv_writer.writerow([
+                        "Timestamp", "MonitoredHost", "ResolvedIP",
+                        "LatencyMS", "IsSuccess"
+                    ])
+                    self.output_file_handle.flush() # Ensure header is written immediately
+            except IOError as e:
+                self.logger.error(
+                    f"Error opening or writing header to CSV file "
+                    f"'{self.output_file_path}': {e}. CSV logging will be disabled."
+                )
+                # Ensure these are None if setup fails
+                if self.output_file_handle:
+                    self.output_file_handle.close()
+                self.output_file_handle = None
+                self.csv_writer = None
+                self.output_file_path = None # Disable further attempts
 
     def _load_config_from_file(self):
         """
@@ -288,6 +354,9 @@ class NetworkMonitor:
                         "ymax": config.get("MonitorSettings", "ymax", fallback=None),
                         "yticks": config.get(
                             "MonitorSettings", "yticks", fallback=None
+                        ),
+                        "output_file": config.get(
+                            "MonitorSettings", "output_file", fallback=None
                         ),
                     }
                     for key, value in settings_map.items():
@@ -803,6 +872,30 @@ class NetworkMonitor:
                 # FUTURE: Consider a DataPoint class/namedtuple to store
                 # (timestamp, real_latency, plot_latency) to unify data handling.
 
+                # Log to CSV if enabled
+                if self.csv_writer:
+                    timestamp = datetime.now().isoformat()
+                    is_success = current_latency_real is not None
+                    latency_ms_for_csv = current_latency_real if is_success else ''
+                    row_data = [
+                        timestamp,
+                        self.host,
+                        self.resolved_ip if self.resolved_ip else '',
+                        latency_ms_for_csv,
+                        is_success
+                    ]
+                    try:
+                        self.csv_writer.writerow(row_data)
+                        if self.output_file_handle: # Should exist if csv_writer exists
+                            self.output_file_handle.flush()
+                    except IOError as e:
+                        self.logger.error(f"Error writing to CSV file: {e}. Disabling further CSV logging.")
+                        if self.output_file_handle:
+                            self.output_file_handle.close()
+                        self.csv_writer = None
+                        self.output_file_handle = None
+                        self.output_file_path = None # To prevent re-opening
+
                 # Update data for history (accurate values for stats)
                 if len(self.latency_history_real_values) >= self.max_data_points:
                     self.latency_history_real_values.pop(0)
@@ -875,6 +968,12 @@ def main():
         type=int,
         default=DEFAULT_Y_TICKS_ARG,
         help="Desired approximate number of Y-axis ticks.",
+    )
+    parser.add_argument(
+        '-o', '--output-file',
+        type=str,
+        default=None, # Default to no output file
+        help='Path to CSV file for logging latency data.'
     )
     args = parser.parse_args()
 

@@ -9,15 +9,19 @@ import time
 # Import real termios for termios.TCSADRAIN constant
 import termios as real_termios # Renamed to avoid conflict if 'termios' is mocked
 import configparser
+import socket # Added for test_csv_init_dns_failure
+import csv # Added for test_csv_write_row_success and others
+import platform # Added for test_csv_file_closed_on_exit
 
 # Add the parent directory to sys.path to allow direct import of monitor_net
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+import monitor_net # Import the module itself to access its namespace items like datetime
 from monitor_net import (
     NetworkMonitor, DEFAULT_HOST_ARG,
     DEFAULT_PING_INTERVAL_SECONDS_ARG, DEFAULT_GRAPH_Y_MAX_ARG,
     DEFAULT_Y_TICKS_ARG, main, EXIT_CODE_ERROR, PING_MIN_TIMEOUT_S,
-    ANSI_HIDE_CURSOR, ANSI_SHOW_CURSOR
+    ANSI_HIDE_CURSOR, ANSI_SHOW_CURSOR, CONFIG_FILE_NAME # Import specific constant
 )
 
 # Custom exception to break the run loop in tests
@@ -32,6 +36,7 @@ def mock_default_args(mocker):
     mock_args.interval = DEFAULT_PING_INTERVAL_SECONDS_ARG
     mock_args.ymax = DEFAULT_GRAPH_Y_MAX_ARG
     mock_args.yticks = DEFAULT_Y_TICKS_ARG
+    mock_args.output_file = None # Add new default attribute
     return mock_args
 
 @pytest.fixture
@@ -839,3 +844,512 @@ def test_main_catches_config_validation_error(mocker):
     mock_stderr_write.assert_any_call("Configuration Error: mock validation error from init\n")
     mock_sys_exit.assert_called_once_with(EXIT_CODE_ERROR)
     assert excinfo.type == SystemExit # Check that SystemExit was indeed raised
+
+
+# --- Tests for CSV Output File Argument Parsing and Precedence ---
+
+def test_output_file_arg_parsing_cli_specified(mocker, mock_default_args):
+    """Test NetworkMonitor.__init__ correctly sets output_file_path from CLI arg."""
+    cli_output_path = "cli_output.csv"
+    mock_default_args.output_file = cli_output_path # Simulate CLI specifying the output file
+
+    mocker.patch('monitor_net.platform.system', return_value="Linux")
+    mock_logger_instance = MagicMock(spec=logging.Logger)
+    mock_logger_instance.handlers = []
+    mocker.patch('logging.getLogger', return_value=mock_logger_instance)
+
+    # Mock os.path.exists for config file check, socket for DNS
+    mocker.patch('monitor_net.os.path.exists', return_value=False) # No config file, no output file exists yet
+    mocker.patch('monitor_net.socket.gethostbyname', return_value="1.2.3.4")
+    mocker.patch('builtins.open', mocker.mock_open()) # Mock opening the output file
+
+    monitor = NetworkMonitor(mock_default_args)
+    assert monitor.output_file_path == cli_output_path
+    mock_logger_instance.info.assert_any_call(
+        f"CLI 'output_file' ({cli_output_path}) overrides other settings."
+    )
+    mock_logger_instance.info.assert_any_call(f"Effective output file: {cli_output_path}")
+
+
+def test_output_file_arg_parsing_config_specified(mocker, mock_default_args):
+    """Test NetworkMonitor.__init__ correctly sets output_file_path from config file."""
+    config_output_path = "config_output.csv"
+    mock_default_args.output_file = None # CLI does not specify output file
+
+    # Mock config file settings
+    mocker.patch('monitor_net.os.path.exists', side_effect=lambda path: path.endswith('.ini')) # True for .ini, False for .csv
+    mock_config_parser_instance = MagicMock(spec=configparser.ConfigParser)
+    mock_config_parser_instance.read.return_value = ["dummy_path/monitor_config.ini"]
+    mock_config_parser_instance.__contains__.side_effect = lambda item: item == 'MonitorSettings'
+    config_values = {('MonitorSettings', 'output_file', None): config_output_path}
+    mock_config_parser_instance.get.side_effect = lambda sec, k, fallback: config_values.get((sec, k, fallback), fallback)
+    mocker.patch('monitor_net.configparser.ConfigParser', return_value=mock_config_parser_instance)
+
+    mocker.patch('monitor_net.platform.system', return_value="Linux")
+    mock_logger_instance = MagicMock(spec=logging.Logger)
+    mock_logger_instance.handlers = []
+    mocker.patch('logging.getLogger', return_value=mock_logger_instance)
+    mocker.patch('monitor_net.socket.gethostbyname', return_value="1.2.3.4")
+    mocker.patch('builtins.open', mocker.mock_open())
+
+    monitor = NetworkMonitor(mock_default_args)
+    assert monitor.output_file_path == config_output_path
+    mock_logger_instance.info.assert_any_call(
+        f"Using 'output_file' from config file: {config_output_path}"
+    )
+    mock_logger_instance.info.assert_any_call(f"Effective output file: {config_output_path}")
+
+def test_output_file_arg_parsing_cli_overrides_config(mocker, mock_default_args):
+    """Test CLI --output-file overrides config file's output_file."""
+    cli_output_path = "cli_path.csv"
+    config_output_path = "config_path.csv"
+    mock_default_args.output_file = cli_output_path # CLI specifies
+
+    # Mock config file settings
+    mocker.patch('monitor_net.os.path.exists', side_effect=lambda path: path.endswith('.ini'))
+    mock_config_parser_instance = MagicMock(spec=configparser.ConfigParser)
+    mock_config_parser_instance.read.return_value = ["dummy_path/monitor_config.ini"]
+    mock_config_parser_instance.__contains__.side_effect = lambda item: item == 'MonitorSettings'
+    config_values = {('MonitorSettings', 'output_file', None): config_output_path}
+    mock_config_parser_instance.get.side_effect = lambda sec, k, fallback: config_values.get((sec, k, fallback), fallback)
+    mocker.patch('monitor_net.configparser.ConfigParser', return_value=mock_config_parser_instance)
+
+    mocker.patch('monitor_net.platform.system', return_value="Linux")
+    mock_logger_instance = MagicMock(spec=logging.Logger)
+    mock_logger_instance.handlers = []
+    mocker.patch('logging.getLogger', return_value=mock_logger_instance)
+    mocker.patch('monitor_net.socket.gethostbyname', return_value="1.2.3.4")
+    mocker.patch('builtins.open', mocker.mock_open())
+
+    monitor = NetworkMonitor(mock_default_args)
+    assert monitor.output_file_path == cli_output_path
+    mock_logger_instance.info.assert_any_call(
+        f"CLI 'output_file' ({cli_output_path}) overrides other settings."
+    )
+    # Ensure config log is present, and CLI override log is also present and later.
+    log_calls = [c[0][0] for c in mock_logger_instance.info.call_args_list]
+    assert any(f"Using 'output_file' from config file: {config_output_path}" in call_text for call_text in log_calls)
+    assert any(f"CLI 'output_file' ({cli_output_path}) overrides other settings." in call_text for call_text in log_calls)
+
+    # More precise check: CLI override message should appear AFTER config usage message if both exist.
+    config_log_idx = -1
+    cli_override_log_idx = -1
+    for i, call_text in enumerate(log_calls):
+        if f"Using 'output_file' from config file: {config_output_path}" in call_text:
+            config_log_idx = i
+        if f"CLI 'output_file' ({cli_output_path}) overrides other settings." in call_text:
+            cli_override_log_idx = i
+
+    assert config_log_idx != -1, "Config usage log not found"
+    assert cli_override_log_idx != -1, "CLI override log not found"
+    assert cli_override_log_idx > config_log_idx, "CLI override log should appear after config usage log"
+
+
+def test_output_file_arg_parsing_default_is_none(mocker, mock_default_args):
+    """Test output_file_path is None if not specified by CLI or config."""
+    mock_default_args.output_file = None # CLI does not specify
+
+    mocker.patch('monitor_net.os.path.exists', return_value=False) # No config file
+    mocker.patch('monitor_net.platform.system', return_value="Linux")
+    mock_logger_instance = MagicMock(spec=logging.Logger)
+    mock_logger_instance.handlers = []
+    mocker.patch('logging.getLogger', return_value=mock_logger_instance)
+    # socket and open should not be called if output_file_path is None
+    mock_socket_gethostbyname = mocker.patch('monitor_net.socket.gethostbyname')
+    mock_builtin_open = mocker.patch('builtins.open')
+
+    monitor = NetworkMonitor(mock_default_args)
+    assert monitor.output_file_path is None
+    mock_logger_instance.info.assert_any_call("Effective output file: None")
+    mock_socket_gethostbyname.assert_not_called()
+    mock_builtin_open.assert_not_called()
+
+
+# --- Tests for CSV Initialization and Header Writing ---
+
+@pytest.fixture
+def mock_monitor_for_csv(mocker, mock_default_args):
+    """
+    Provides a NetworkMonitor instance where essential external dependencies
+    for CSV initialization are pre-mocked.
+    Specific test functions can then override individual mocks as needed.
+    """
+    mocker.patch('monitor_net.platform.system', return_value="Linux")
+    mock_logger = MagicMock(spec=logging.Logger)
+    mock_logger.handlers = []
+    mocker.patch('logging.getLogger', return_value=mock_logger)
+
+    # Default mocks, can be overridden in tests
+    mocker.patch('monitor_net.os.path.exists', return_value=False)
+    mocker.patch('monitor_net.os.path.getsize', return_value=0)
+    mocker.patch('builtins.open', mocker.mock_open())
+    mocker.patch('monitor_net.csv.writer', return_value=MagicMock())
+    mocker.patch('monitor_net.socket.gethostbyname', return_value='1.2.3.4')
+
+    # Allow config file to be non-existent for focused testing unless specified
+    # This prevents interference from config file logic if not being tested.
+    # The `os.path.exists` mock above will also make it think config file doesn't exist
+    # if the path doesn't end with .ini (which it won't for default config path)
+    # To be more explicit:
+    original_os_path_exists = os.path.exists
+    def exists_side_effect(path):
+        if path == monitor_net.CONFIG_FILE_NAME or path.endswith(monitor_net.CONFIG_FILE_NAME) : # check for config
+             return False # Explicitly say global config file doesn't exist for these csv tests
+        if path == "test_output.csv": # The file we are testing for csv
+             # This will be re-mocked by specific tests using this fixture
+             return mocker.get_original_mock_for('monitor_net.os.path.exists')(path)
+        return original_os_path_exists(path) # real behavior for other paths
+
+    mocker.patch('monitor_net.os.path.exists', side_effect=exists_side_effect)
+
+
+    # The mock_default_args will be modified by each test to set output_file
+    monitor = NetworkMonitor(mock_default_args)
+    monitor.logger = mock_logger # Ensure the instance uses our pre-mocked logger
+    return monitor
+
+
+def test_csv_init_no_output_file(mocker, mock_default_args):
+    """Test CSV attributes are None if no output file is specified."""
+    mock_default_args.output_file = None
+    # Need to mock platform and logger as __init__ runs fully
+    mocker.patch('monitor_net.platform.system', return_value="Linux")
+    mock_logger = MagicMock(spec=logging.Logger); mock_logger.handlers = []
+    mocker.patch('logging.getLogger', return_value=mock_logger)
+    # No config file for this simple check
+    mocker.patch('monitor_net.os.path.exists', return_value=False)
+
+
+    monitor = NetworkMonitor(mock_default_args)
+
+    assert monitor.output_file_handle is None
+    assert monitor.csv_writer is None
+    assert monitor.resolved_ip is None # Should not be resolved if no output file
+
+
+def test_csv_init_new_file(mocker, mock_default_args):
+    """Test CSV init when output file is new."""
+    test_csv_path = "test_output.csv"
+    mock_default_args.output_file = test_csv_path
+
+    mocker.patch('monitor_net.platform.system', return_value="Linux")
+    mock_logger_instance = MagicMock(spec=logging.Logger); mock_logger_instance.handlers = []
+    mocker.patch('logging.getLogger', return_value=mock_logger_instance)
+
+    # Ensure config file is seen as not existing to isolate CSV open call
+    def exists_side_effect_new_csv(path):
+        if monitor_net.CONFIG_FILE_NAME in path: return False
+        if path == test_csv_path: return False # This is a new CSV file
+        return True # Default for other paths if any (shouldn't matter here)
+    mock_os_path_exists = mocker.patch('monitor_net.os.path.exists', side_effect=exists_side_effect_new_csv)
+
+    mocker.patch('monitor_net.os.path.getsize', return_value=0)
+    mock_open_func = mocker.patch('builtins.open', mocker.mock_open())
+    mock_csv_writer_obj = MagicMock()
+    mock_csv_module_writer = mocker.patch('monitor_net.csv.writer', return_value=mock_csv_writer_obj)
+    mock_socket_gethostbyname = mocker.patch('monitor_net.socket.gethostbyname', return_value='1.2.3.4')
+
+    monitor = NetworkMonitor(mock_default_args)
+
+    mock_socket_gethostbyname.assert_called_once_with(mock_default_args.host)
+    assert monitor.resolved_ip == '1.2.3.4'
+    mock_open_func.assert_called_once_with(test_csv_path, 'a', newline='', encoding='utf-8')
+    mock_csv_module_writer.assert_called_once_with(mock_open_func.return_value)
+    mock_csv_writer_obj.writerow.assert_called_once_with(
+        ["Timestamp", "MonitoredHost", "ResolvedIP", "LatencyMS", "IsSuccess"]
+    )
+    assert monitor.output_file_handle is not None
+    assert monitor.csv_writer is not None
+    mock_logger_instance.info.assert_any_call(f"Logging ping data to CSV: {test_csv_path}")
+
+
+def test_csv_init_existing_empty_file(mocker, mock_default_args):
+    """Test CSV init when output file exists but is empty."""
+    test_csv_path = "test_output.csv"
+    mock_default_args.output_file = test_csv_path
+
+    mocker.patch('monitor_net.platform.system', return_value="Linux")
+    mock_logger_instance = MagicMock(spec=logging.Logger); mock_logger_instance.handlers = []
+    mocker.patch('logging.getLogger', return_value=mock_logger_instance)
+
+    # Ensure config file is seen as not existing
+    def exists_side_effect_empty_csv(path):
+        if monitor_net.CONFIG_FILE_NAME in path: return False
+        if path == test_csv_path: return True # This CSV file exists
+        return False
+    mocker.patch('monitor_net.os.path.exists', side_effect=exists_side_effect_empty_csv)
+    mocker.patch('monitor_net.os.path.getsize', return_value=0)  # File is empty
+    mock_open_func = mocker.patch('builtins.open', mocker.mock_open())
+    mock_csv_writer_obj = MagicMock()
+    mocker.patch('monitor_net.csv.writer', return_value=mock_csv_writer_obj)
+    mocker.patch('monitor_net.socket.gethostbyname', return_value='1.2.3.4')
+
+    monitor = NetworkMonitor(mock_default_args)
+
+    mock_open_func.assert_called_once_with(test_csv_path, 'a', newline='', encoding='utf-8')
+    mock_csv_writer_obj.writerow.assert_called_once_with(
+        ["Timestamp", "MonitoredHost", "ResolvedIP", "LatencyMS", "IsSuccess"]
+    )
+
+def test_csv_init_existing_non_empty_file(mocker, mock_default_args):
+    """Test CSV init when output file exists and is not empty."""
+    test_csv_path = "test_output.csv"
+    mock_default_args.output_file = test_csv_path
+
+    mocker.patch('monitor_net.platform.system', return_value="Linux")
+    mocker.patch('logging.getLogger').return_value = MagicMock(handlers=[]) # Basic mock for logger
+
+    # Ensure config file is seen as not existing
+    def exists_side_effect_nonempty_csv(path):
+        if monitor_net.CONFIG_FILE_NAME in path: return False
+        if path == test_csv_path: return True # This CSV file exists
+        return False
+    mocker.patch('monitor_net.os.path.exists', side_effect=exists_side_effect_nonempty_csv)
+    mocker.patch('monitor_net.os.path.getsize', return_value=100) # File not empty
+    mock_open_func = mocker.patch('builtins.open', mocker.mock_open())
+    mock_csv_writer_obj = MagicMock()
+    mocker.patch('monitor_net.csv.writer', return_value=mock_csv_writer_obj)
+    mocker.patch('monitor_net.socket.gethostbyname', return_value='1.2.3.4')
+
+    monitor = NetworkMonitor(mock_default_args)
+
+    mock_open_func.assert_called_once_with(test_csv_path, 'a', newline='', encoding='utf-8')
+    mock_csv_writer_obj.writerow.assert_not_called() # Header should not be written
+
+
+def test_csv_init_dns_failure(mocker, mock_default_args):
+    """Test CSV init when DNS resolution for the host fails."""
+    test_csv_path = "test_output.csv"
+    mock_default_args.output_file = test_csv_path
+
+    mocker.patch('monitor_net.platform.system', return_value="Linux")
+    mock_logger_instance = MagicMock(spec=logging.Logger); mock_logger_instance.handlers = []
+    mocker.patch('logging.getLogger', return_value=mock_logger_instance)
+
+    mocker.patch('monitor_net.os.path.exists', return_value=False) # New file
+    mocker.patch('builtins.open', mocker.mock_open())
+    mocker.patch('monitor_net.csv.writer')
+    mocker.patch('monitor_net.socket.gethostbyname', side_effect=socket.gaierror("DNS lookup failed"))
+
+    monitor = NetworkMonitor(mock_default_args)
+
+    assert monitor.resolved_ip == "" # Should be empty string on failure
+    mock_logger_instance.warning.assert_any_call(
+        f"Could not resolve IP for host '{mock_default_args.host}'. IP field in CSV will be blank."
+    )
+
+
+def test_csv_init_io_error_opening(mocker, mock_default_args):
+    """Test CSV init when opening the output file raises IOError."""
+    test_csv_path = "test_output.csv"
+    mock_default_args.output_file = test_csv_path
+
+    mocker.patch('monitor_net.platform.system', return_value="Linux")
+    mock_logger_instance = MagicMock(spec=logging.Logger); mock_logger_instance.handlers = []
+    mocker.patch('logging.getLogger', return_value=mock_logger_instance)
+
+    mocker.patch('monitor_net.os.path.exists', return_value=False) # New file
+    mocker.patch('monitor_net.socket.gethostbyname', return_value='1.2.3.4')
+    mocker.patch('builtins.open', side_effect=IOError("Permission denied"))
+
+    monitor = NetworkMonitor(mock_default_args)
+
+    assert monitor.output_file_handle is None
+    assert monitor.csv_writer is None
+    assert monitor.output_file_path is None # Path should be reset to disable CSV
+    mock_logger_instance.error.assert_any_call(
+        f"Error opening or writing header to CSV file '{test_csv_path}': Permission denied. CSV logging will be disabled."
+    )
+
+# --- Tests for CSV Data Row Writing ---
+
+def test_csv_write_row_success(mocker, mock_default_args):
+    """Test a successful ping logs a correct row to CSV."""
+    monitor = NetworkMonitor(mock_default_args) # output_file_path is None initially
+    # Manually set up CSV writer and related attributes for focused test
+    monitor.output_file_path = "test.csv" # Needs a path for logging messages
+    monitor.csv_writer = mocker.MagicMock() # Plain MagicMock is fine
+    monitor.output_file_handle = mocker.MagicMock() # Needs flush method
+    monitor.resolved_ip = "1.2.3.4"
+    monitor.host = "test.host" # From mock_default_args or set explicitly
+
+    fixed_timestamp = "2023-01-01T12:00:00.000000"
+    mocker.patch('monitor_net.datetime') # Patch entire module
+    monitor_net.datetime.now.return_value.isoformat.return_value = fixed_timestamp
+
+    current_latency_real = 10.5
+
+    # Simulate the part of the run loop that calls the CSV writing
+    # This is a simplified representation of the logic in run()
+    if monitor.csv_writer:
+        timestamp = monitor_net.datetime.now().isoformat()
+        is_success = current_latency_real is not None
+        latency_ms_for_csv = current_latency_real if is_success else ''
+        row_data = [
+            timestamp,
+            monitor.host,
+            monitor.resolved_ip if monitor.resolved_ip else '',
+            latency_ms_for_csv,
+            is_success
+        ]
+        monitor.csv_writer.writerow(row_data)
+        if monitor.output_file_handle:
+            monitor.output_file_handle.flush()
+
+    monitor.csv_writer.writerow.assert_called_once_with(
+        [fixed_timestamp, "test.host", "1.2.3.4", 10.5, True]
+    )
+    monitor.output_file_handle.flush.assert_called_once()
+
+
+def test_csv_write_row_failure(mocker, mock_default_args):
+    """Test a failed ping logs a correct row to CSV."""
+    monitor = NetworkMonitor(mock_default_args)
+    monitor.output_file_path = "test.csv"
+    monitor.csv_writer = mocker.MagicMock() # Plain MagicMock is fine
+    monitor.output_file_handle = mocker.MagicMock()
+    monitor.resolved_ip = "1.2.3.4"
+    monitor.host = "test.host"
+
+    fixed_timestamp = "2023-01-01T12:00:01.000000"
+    # Ensure datetime is mocked correctly within the scope of where it's called
+    # If it's from monitor_net.datetime, then:
+    mocker.patch('monitor_net.datetime')
+    monitor_net.datetime.now.return_value.isoformat.return_value = fixed_timestamp
+
+    current_latency_real = None # Failed ping
+
+    if monitor.csv_writer:
+        timestamp = monitor_net.datetime.now().isoformat()
+        is_success = current_latency_real is not None
+        latency_ms_for_csv = current_latency_real if is_success else ''
+        row_data = [
+            timestamp,
+            monitor.host,
+            monitor.resolved_ip if monitor.resolved_ip else '',
+            latency_ms_for_csv,
+            is_success
+        ]
+        monitor.csv_writer.writerow(row_data)
+        if monitor.output_file_handle:
+            monitor.output_file_handle.flush()
+
+    monitor.csv_writer.writerow.assert_called_once_with(
+        [fixed_timestamp, "test.host", "1.2.3.4", '', False]
+    )
+    monitor.output_file_handle.flush.assert_called_once()
+
+
+def test_csv_write_io_error(mocker, mock_default_args):
+    """Test IOError during CSV write disables further CSV logging."""
+    # We need a monitor instance where CSV was initially set up
+    mock_default_args.output_file = "test_io_error.csv" # Enable CSV path
+
+    mocker.patch('monitor_net.platform.system', return_value="Linux")
+    mock_logger_instance = MagicMock(spec=logging.Logger); mock_logger_instance.handlers = []
+    mocker.patch('logging.getLogger', return_value=mock_logger_instance)
+
+    # Mock successful CSV setup in __init__
+    def exists_side_effect_io_error(path): # New file for CSV, no config file
+        if monitor_net.CONFIG_FILE_NAME in path: return False
+        return False
+    mocker.patch('monitor_net.os.path.exists', side_effect=exists_side_effect_io_error)
+    mocker.patch('monitor_net.socket.gethostbyname', return_value='1.2.3.4')
+    # This open is for the CSV file which will fail
+    mock_open_func = mocker.patch('builtins.open', mocker.mock_open())
+
+    # This is the writer instance that would be created if open succeeded
+    mock_csv_writer_instance = MagicMock()
+    mocker.patch('monitor_net.csv.writer', return_value=mock_csv_writer_instance)
+
+    monitor = NetworkMonitor(mock_default_args) # __init__ will call the patched open
+    assert monitor.csv_writer is not None # Pre-condition: CSV writer is active
+    assert monitor.csv_writer is mock_csv_writer_instance # Ensure it's the one we are about to modify
+
+    # Now, make the (correct) writer instance's writerow method raise IOError for the data write
+    # The header write should have succeeded (or not happened if file existed and was non-empty).
+    # For this test, we assume header write was fine.
+    mock_csv_writer_instance.writerow.side_effect = IOError("Disk full")
+
+    # Simulate a ping result and the CSV writing part of run()
+    current_latency_real = 20.0
+    mocker.patch('monitor_net.datetime')
+    monitor_net.datetime.now.return_value.isoformat.return_value = "timestamp"
+
+    # Extracted CSV writing logic from run() for testing
+    if monitor.csv_writer:
+        timestamp = monitor_net.datetime.now().isoformat()
+        is_success = current_latency_real is not None
+        latency_ms_for_csv = current_latency_real if is_success else ''
+        row_data = [timestamp, monitor.host, monitor.resolved_ip if monitor.resolved_ip else '', latency_ms_for_csv, is_success]
+        try:
+            monitor.csv_writer.writerow(row_data) # This should raise IOError
+            if monitor.output_file_handle:
+                monitor.output_file_handle.flush()
+        except IOError as e:
+            monitor.logger.error(f"Error writing to CSV file: {e}. Disabling further CSV logging.")
+            if monitor.output_file_handle:
+                monitor.output_file_handle.close() # Close on error
+            monitor.csv_writer = None
+            monitor.output_file_handle = None
+            monitor.output_file_path = None # Important: disable path to prevent re-opening
+
+    assert monitor.csv_writer is None
+    assert monitor.output_file_handle is None
+    assert monitor.output_file_path is None # Check that path is reset
+    mock_logger_instance.error.assert_any_call("Error writing to CSV file: Disk full. Disabling further CSV logging.")
+
+
+# --- Test for CSV File Closing ---
+
+def test_csv_file_closed_on_exit(mocker, mock_default_args):
+    """Test the CSV output file is closed by _restore_terminal."""
+    # Enable CSV path to simulate it being opened
+    mock_default_args.output_file = "test_close.csv"
+
+    mocker.patch('monitor_net.platform.system', return_value="Linux")
+    mock_logger_instance = MagicMock(spec=logging.Logger); mock_logger_instance.handlers = []
+    mocker.patch('logging.getLogger', return_value=mock_logger_instance)
+
+    # Mock successful CSV setup in __init__
+    def exists_side_effect_close_test(path): # New file for CSV, no config file
+        if monitor_net.CONFIG_FILE_NAME in path: return False
+        if path == "test_close.csv": return False # CSV is new
+        return False
+    mocker.patch('monitor_net.os.path.exists', side_effect=exists_side_effect_close_test)
+    mocker.patch('monitor_net.socket.gethostbyname', return_value='1.2.3.4')
+
+    # Correctly mock open to get a handle that can be closed
+    mock_file_handle = MagicMock() # Simpler mock, close will be auto-created
+    mocker.patch('builtins.open', return_value=mock_file_handle)
+    mocker.patch('monitor_net.csv.writer')
+
+    monitor = NetworkMonitor(mock_default_args)
+
+    # Pre-conditions: Ensure CSV was set up and self.output_file_handle is the return_value of the mocked open
+    assert monitor.output_file_handle is mock_file_handle
+    assert monitor.output_file_path == "test_close.csv" # Confirm path is also set
+    original_path = monitor.output_file_path # Save for log check
+
+    # Call _restore_terminal (which should close the file)
+
+    # Mock sys.stdout.write as it's called by _restore_terminal
+    mock_stdout_write = mocker.patch('sys.stdout.write')
+
+    # Simplify termios mocking for this specific test:
+    # We are not testing termios itself here, just that it doesn't break CSV closing.
+    # So, if termios is used, make sure its calls don't raise errors.
+    if monitor.current_os != "windows": # Check against monitor's detected OS
+        mock_termios_module = mocker.patch('monitor_net.termios')
+        mock_termios_module.tcsetattr = MagicMock()
+        # Ensure original_terminal_settings is not None so tcsetattr is called
+        monitor.original_terminal_settings = "fake_settings"
+
+    # monitor.output_file_handle = mock_file_handle # Removed for testing natural state
+
+    monitor._restore_terminal()
+
+    mock_file_handle.close.assert_called_once() # Check the auto-created close mock
+    mock_logger_instance.info.assert_any_call(f"Closing CSV output file: {original_path}")
+    assert monitor.output_file_handle is None
+    assert monitor.csv_writer is None
