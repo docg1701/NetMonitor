@@ -1210,6 +1210,207 @@ def test_percentiles_statistics_error(monitor_instance_base, mocker):
     monitor_instance_base.logger.warning.assert_any_call(
         "Could not calculate quantiles for latency percentiles: mock quantiles error"
     )
+
+
+# --- Edge Case Tests for Configuration File Logic ---
+
+def test_config_file_empty_monitor_settings_section(mocker, mock_default_args):
+    """Test config file with an empty [MonitorSettings] section."""
+    mocker.patch('monitor_net.os.path.exists', return_value=True) # Config file exists
+
+    mock_config_parser_instance = MagicMock(spec=configparser.ConfigParser)
+    mock_config_parser_instance.read.return_value = ["dummy_path/monitor_config.ini"]
+    mock_config_parser_instance.__contains__.side_effect = lambda item: item == 'MonitorSettings'
+    # Simulate get returning None (or fallback) for all requested keys
+    mock_config_parser_instance.get.return_value = None
+    mocker.patch('monitor_net.configparser.ConfigParser', return_value=mock_config_parser_instance)
+
+    mocker.patch('monitor_net.platform.system', return_value="Linux")
+    mock_logger_instance = MagicMock(spec=logging.Logger); mock_logger_instance.handlers = []
+    mocker.patch('logging.getLogger', return_value=mock_logger_instance)
+    mocker.patch('monitor_net.socket.gethostbyname') # Not relevant here, but __init__ calls it
+    mocker.patch('builtins.open', mocker.mock_open()) # Avoid file system for this test
+
+    monitor = NetworkMonitor(mock_default_args)
+
+    assert monitor.config_file_settings == {} # No settings should have been loaded
+    # Assert that final settings are defaults (since CLI args are also default in mock_default_args)
+    assert monitor.host == DEFAULT_HOST_ARG
+    assert monitor.ping_interval == DEFAULT_PING_INTERVAL_SECONDS_ARG
+    assert monitor.graph_y_max == DEFAULT_GRAPH_Y_MAX_ARG
+    assert monitor.y_ticks == DEFAULT_Y_TICKS_ARG
+    assert monitor.output_file_path is None
+
+    # Check logs for "MonitorSettings section found" but no "Using ... from config file"
+    log_calls = [c[0][0] for c in mock_logger_instance.info.call_args_list]
+    assert any("[MonitorSettings] section found" in msg for msg in log_calls)
+    assert not any("Using 'host' from config file" in msg for msg in log_calls)
+    assert not any("Using 'interval' from config file" in msg for msg in log_calls)
+
+
+def test_config_file_with_extra_keys(mocker, mock_default_args):
+    """Test config file with extra, unrecognized keys in [MonitorSettings]."""
+    mocker.patch('monitor_net.os.path.exists', return_value=True)
+
+    mock_config_parser_instance = MagicMock(spec=configparser.ConfigParser)
+    mock_config_parser_instance.read.return_value = ["dummy_path/monitor_config.ini"]
+    mock_config_parser_instance.__contains__.side_effect = lambda item: item == 'MonitorSettings'
+
+    def get_side_effect(section, key, fallback):
+        if section == 'MonitorSettings':
+            if key == 'host': return "config.host.com"
+            if key == 'interval': return "3.0"
+            # _load_config_from_file only tries to get known keys.
+            # So, extra_key will not be asked for by config.get()
+        return fallback
+
+    mock_config_parser_instance.get.side_effect = get_side_effect
+    mocker.patch('monitor_net.configparser.ConfigParser', return_value=mock_config_parser_instance)
+
+    mocker.patch('monitor_net.platform.system', return_value="Linux")
+    mock_logger_instance = MagicMock(spec=logging.Logger); mock_logger_instance.handlers = []
+    mocker.patch('logging.getLogger', return_value=mock_logger_instance)
+    mocker.patch('monitor_net.socket.gethostbyname')
+    mocker.patch('builtins.open', mocker.mock_open())
+
+    monitor = NetworkMonitor(mock_default_args)
+
+    # Only known keys should be in config_file_settings
+    assert 'host' in monitor.config_file_settings
+    assert 'interval' in monitor.config_file_settings
+    assert 'extra_key' not in monitor.config_file_settings
+    assert monitor.config_file_settings.get('host') == "config.host.com"
+
+    assert monitor.host == "config.host.com" # Assuming no CLI override
+    assert monitor.ping_interval == 3.0
+
+
+def test_config_file_with_empty_string_values(mocker, mock_default_args):
+    """Test config file with empty string values for some settings."""
+    mocker.patch('monitor_net.os.path.exists', return_value=True)
+
+    mock_config_parser_instance = MagicMock(spec=configparser.ConfigParser)
+    mock_config_parser_instance.read.return_value = ["dummy_path/monitor_config.ini"]
+    mock_config_parser_instance.__contains__.side_effect = lambda item: item == 'MonitorSettings'
+
+    config_values = {
+        ('MonitorSettings', 'host', None): "",          # Empty string
+        ('MonitorSettings', 'interval', None): "",      # Empty string, should fail conversion
+        ('MonitorSettings', 'ymax', None): "100.0",     # Valid
+        ('MonitorSettings', 'yticks', None): "",        # Empty string, should fail conversion
+        ('MonitorSettings', 'output_file', None): "" # Empty string, should be ignored
+    }
+    mock_config_parser_instance.get.side_effect = lambda sec, k, fb: config_values.get((sec, k, fb), fb)
+    mocker.patch('monitor_net.configparser.ConfigParser', return_value=mock_config_parser_instance)
+
+    mocker.patch('monitor_net.platform.system', return_value="Linux")
+    mock_logger_instance = MagicMock(spec=logging.Logger); mock_logger_instance.handlers = []
+    mocker.patch('logging.getLogger', return_value=mock_logger_instance)
+    mocker.patch('monitor_net.socket.gethostbyname')
+    mocker.patch('builtins.open', mocker.mock_open())
+
+    monitor = NetworkMonitor(mock_default_args)
+
+    # Host might accept empty string if not overridden, depends on subsequent validation if any
+    assert monitor.host == ""
+    # Interval should fail conversion and fall back to default
+    assert monitor.ping_interval == DEFAULT_PING_INTERVAL_SECONDS_ARG
+    assert monitor.graph_y_max == 100.0 # Valid config
+    # Yticks should fail conversion and fall back to default
+    assert monitor.y_ticks == DEFAULT_Y_TICKS_ARG
+    # Output file path with empty string is ignored by strip() check
+    assert monitor.output_file_path is None
+
+    # Check for warnings for failed conversions
+    log_calls_warning = [c[0][0] for c in mock_logger_instance.warning.call_args_list]
+    assert any("Invalid value '' for 'interval'" in msg for msg in log_calls_warning)
+    assert any("Invalid value '' for 'yticks'" in msg for msg in log_calls_warning)
+
+    # Check info logs for successful application where appropriate
+    log_calls_info = [c[0][0] for c in mock_logger_instance.info.call_args_list]
+    assert any("Using 'host' from config file: " in msg for msg in log_calls_info) # host=""
+    assert any("Using 'ymax' from config file: 100.0" in msg for msg in log_calls_info)
+    assert not any("Using 'output_file' from config file: " in msg for msg in log_calls_info)
+
+
+# --- Edge Case Tests for CSV Export Logic ---
+
+def test_csv_init_output_path_is_directory(mocker, mock_default_args):
+    """Test CSV init if the output file path is actually a directory."""
+    directory_path = "a_directory_path"
+    mock_default_args.output_file = directory_path
+
+    mocker.patch('monitor_net.platform.system', return_value="Linux")
+    mock_logger_instance = MagicMock(spec=logging.Logger); mock_logger_instance.handlers = []
+    mocker.patch('logging.getLogger', return_value=mock_logger_instance)
+
+    # os.path.exists for the directory should be True.
+    # os.path.getsize would raise an error for a directory, or return non-zero.
+    # The crucial part is that open() should fail.
+    mocker.patch('monitor_net.os.path.exists', return_value=True)
+    mocker.patch('monitor_net.socket.gethostbyname', return_value='1.2.3.4') # DNS lookup succeeds
+
+    # Simulate open() raising IsADirectoryError
+    # Note: On some OS, open() might raise PermissionError or a generic IOError for a directory.
+    # IsADirectoryError is specific to POSIX-like systems for open(directory, 'a').
+    # For cross-platform, checking for IOError is more robust in the main code.
+    # The test will use IsADirectoryError as it's a likely specific error.
+    mocker.patch('builtins.open', side_effect=IsADirectoryError(f"[Errno 21] Is a directory: '{directory_path}'"))
+
+    monitor = NetworkMonitor(mock_default_args)
+
+    assert monitor.output_file_handle is None
+    assert monitor.csv_writer is None
+    assert monitor.output_file_path is None # CSV logging should be disabled
+
+    # Check that an error message was logged
+    found_error_log = False
+    for call_arg in mock_logger_instance.error.call_args_list:
+        msg = call_arg[0][0] # Get the first positional argument of the call
+        if f"Error opening or writing header to CSV file '{directory_path}'" in msg and \
+           "Is a directory" in msg and "CSV logging will be disabled" in msg:
+            found_error_log = True
+            break
+    assert found_error_log, "Specific error log for IsADirectoryError not found"
+
+
+def test_csv_write_row_resolved_ip_empty(mocker, mock_default_args):
+    """Test CSV row writing when resolved_ip was set to empty string (e.g. DNS fail)."""
+    monitor = NetworkMonitor(mock_default_args) # output_file_path is None initially by fixture
+
+    # Manually set up CSV writer and attributes for this focused test
+    monitor.output_file_path = "test_resolved_ip.csv"
+    monitor.csv_writer = mocker.MagicMock()
+    monitor.output_file_handle = mocker.MagicMock()
+    monitor.resolved_ip = "" # Simulate DNS failure during init made it empty
+    monitor.host = "failed.host.com"
+
+    fixed_timestamp = "2023-01-01T13:00:00.000000"
+    mocker.patch('monitor_net.datetime')
+    monitor_net.datetime.now.return_value.isoformat.return_value = fixed_timestamp
+
+    current_latency_real = 12.34 # Successful ping
+
+    # Simulate the part of the run loop that calls the CSV writing
+    if monitor.csv_writer:
+        timestamp = monitor_net.datetime.now().isoformat()
+        is_success = current_latency_real is not None
+        latency_ms_for_csv = current_latency_real if is_success else ''
+        row_data = [
+            timestamp,
+            monitor.host,
+            monitor.resolved_ip if monitor.resolved_ip else '', # This should use the ""
+            latency_ms_for_csv,
+            is_success
+        ]
+        monitor.csv_writer.writerow(row_data)
+        if monitor.output_file_handle:
+            monitor.output_file_handle.flush()
+
+    monitor.csv_writer.writerow.assert_called_once_with(
+        [fixed_timestamp, "failed.host.com", "", 12.34, True]
+    )
+    monitor.output_file_handle.flush.assert_called_once()
     assert monitor.resolved_ip is None # Should not be resolved if no output file
 
 
