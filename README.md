@@ -94,6 +94,20 @@ After installation, the `netmonitor` command should be available in your PATH (i
 
 *(Note: If this package were published to PyPI, you could install it with `pip install net-latency-monitor`.)*
 
+## Development using Makefile
+
+A `Makefile` is provided to simplify common development tasks. To use it, ensure you have `make` installed on your system.
+
+Here are some of the most useful targets:
+
+*   `make venv`: Creates the Python virtual environment in `./.venv_monitor_net`.
+*   `make install-dev`: Sets up the virtual environment (if needed) and installs the project in editable mode along with all development dependencies (pytest, flake8, black, etc.) as defined in `pyproject.toml`. This is typically the first command a developer should run.
+*   `make test`: Runs the `pytest` test suite using the Python interpreter from the virtual environment.
+*   `make clean`: Removes the virtual environment, build artifacts, and Python cache files (`__pycache__`, `*.pyc`).
+*   `make help`: Displays a list of all available Makefile targets and their descriptions.
+
+It is recommended to run `make install-dev` first to prepare your development environment. Subsequently, `make test` can be used to run tests, and `make clean` to tidy up the project directory.
+
 ## How to Use
 
 There are several ways to run the network latency monitor:
