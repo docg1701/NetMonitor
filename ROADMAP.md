@@ -46,12 +46,12 @@ This document outlines the implementation plan for the suggested improvements to
 * **Steps:**
     * [X] Analyze the `update_display_and_status` method and identify distinct logical blocks.
     * [X] For each block, create a new private method (prefixed with an underscore) within the `NetworkMonitor` class. Suggestions:
-        * `_display_status_message(self)`
-        * `_prepare_plot_area(self)` (to get terminal size, calculate `plot_height`, `plot_width`)
-        * `_configure_plot_axes_and_labels(self)`
-        * `_plot_latency_series(self)` (for `pltx.plot` and `pltx.scatter`)
-        * `_render_plot(self)` (for `pltx.show()`)
-        * `_display_statistics(self)`
+        * `[X] _display_status_message(self)`
+        * `[X] _prepare_plot_area(self)` (to get terminal size, calculate `plot_height`, `plot_width`)
+        * `[X] _configure_plot_axes_and_labels(self)`
+        * `[X] _plot_latency_series(self)` (for `pltx.plot` and `pltx.scatter`)
+        * `[X] _render_plot(self)` (for `pltx.show()`)
+        * `[X] _display_statistics(self)`
     * [X] The original `update_display_and_status` method will call these new private methods in sequence.
 
 ## Phase 3: Features and Robustness
@@ -90,10 +90,10 @@ This document outlines the implementation plan for the suggested improvements to
     * [X] Create a test directory (e.g., `tests/`).
     * [X] Set up the environment to run tests.
     * [X] Write unit tests for:
-        * The `ping` output parsing method (within `measure_latency`), covering different valid output formats, failure cases, and timeouts. (This may require mocking `subprocess.run`). (Done for `_measure_latency`)
-        * Functions/methods that perform statistical calculations. (Done for `_calculate_average_latency`, etc.)
-        * CLI argument validation. (Done for `main()`)
-        * (If a class is implemented) Test class initialization and the logic of its main methods.
+        * [X] The `ping` output parsing method (within `measure_latency`), covering different valid output formats, failure cases, and timeouts. (This may require mocking `subprocess.run`). (Done for `_measure_latency`)
+        * [X] Functions/methods that perform statistical calculations. (Done for `_calculate_average_latency`, etc.)
+        * [X] CLI argument validation. (Done for `main()`)
+        * [X] (If a class is implemented) Test class initialization and the logic of its main methods.
     * [X] Consider simple integration tests that simulate running the monitor for a few cycles (can be more complex). (Done for `run()` method)
     * [ ] Integrate test execution into a script or Makefile.
 
@@ -115,50 +115,53 @@ This roadmap is a suggestion and can be adjusted as needed. It is recommended to
 ### 5.1. Cross-Platform Compatibility (Windows/macOS)
 *   **Objective:** Allow the `monitor_net.py` script to run on Windows and macOS in addition to Linux.
 *   **Considerations:**
-    *   [ ] Abstract ping functionality:
-        *   Detect OS (e.g., using `platform.system()`).
-        *   Use different ping commands (`ping -n 1` for Windows, `ping -c 1` for macOS/Linux).
-        *   Adapt regex for parsing ping output for each platform.
-    *   [ ] Investigate cross-platform terminal control alternatives if `termios` (POSIX-specific) or `plotext` present issues. (Plotext aims to be cross-platform, but terminal interactions can vary).
+    *   [X] Abstract ping functionality:
+        *   [X] Detect OS (e.g., using `platform.system()`).
+        *   [X] Use different ping commands (`ping -n 1` for Windows, `ping -c 1` for macOS/Linux).
+        *   [X] Adapt regex for parsing ping output for each platform.
+    *   [X] Investigate cross-platform terminal control alternatives if `termios` (POSIX-specific) or `plotext` present issues. (Plotext aims to be cross-platform, but terminal interactions can vary).
     *   [ ] Test thoroughly on all target platforms (Windows, macOS, common Linux distributions).
-    *   [ ] Update `README.md` with platform-specific notes if any.
+    *   [X] Update `README.md` with platform-specific notes if any.
 
 ### 5.2. Configuration File Support
 *   **Objective:** Allow users to specify settings (host, interval, ymax, yticks, etc.) via a configuration file (e.g., INI, YAML, JSON) instead of only CLI arguments.
 *   **Considerations:**
-    *   [ ] Choose a configuration file format (e.g., `configparser` for INI, `PyYAML` for YAML, `json` for JSON). Add new dependency if needed.
-    *   [ ] Implement logic to find and read settings from a configuration file (e.g., `monitor_config.ini` in the user's home directory or script directory).
-    *   [ ] Define precedence: CLI arguments should override configuration file settings, which override built-in defaults.
-    *   [ ] Update help messages to mention the configuration file.
-    *   [ ] Provide a sample configuration file.
+    *   [X] Choose a configuration file format (e.g., `configparser` for INI, `PyYAML` for YAML, `json` for JSON). Add new dependency if needed.
+    *   [X] Implement logic to find and read settings from a configuration file (e.g., `monitor_config.ini` in the user's home directory or script directory).
+    *   [X] Define precedence: CLI arguments should override configuration file settings, which override built-in defaults.
+    *   [X] Update help messages to mention the configuration file.
+    *   [X] Provide a sample configuration file.
 
 ## Phase 6: Data & Insights
 
 ### 6.1. Output Options / Data Export
 *   **Objective:** Allow users to save latency data and statistics to a file.
 *   **Considerations:**
-    *   [ ] Add CLI arguments to specify an output file and format (e.g., `--output-file data.csv --output-format csv`).
-    *   [ ] Support formats like CSV, JSON.
-    *   [ ] Decide what data to save (timestamps, latency, failures, summary statistics).
-    *   [ ] Implement file writing logic, possibly appending data periodically.
+    *   [X] Add CLI arguments to specify an output file and format (e.g., `--output-file data.csv --output-format csv`).
+    *   [X] Support formats like CSV, JSON.
+    *   [X] Decide what data to save (timestamps, latency, failures, summary statistics).
+    *   [X] Implement file writing logic, possibly appending data periodically.
 
 ### 6.2. More Advanced Statistics/Analysis
 *   **Objective:** Provide more insightful statistics beyond basic min/max/avg.
 *   **Considerations:**
-    *   [ ] Calculate standard deviation to show variability.
-    *   [ ] Calculate jitter (variation in latency between pings).
-    *   [ ] Show a histogram or percentile distribution of latencies over the session.
-    *   [ ] Track packet loss percentage more explicitly.
+    *   [X] Calculate standard deviation to show variability.
+    *   [X] Calculate jitter (variation in latency between pings).
+    *   [ ] Show a histogram or percentile distribution of latencies over the session. (Percentiles implemented)
+    *   [X] Track packet loss percentage more explicitly.
+    *   [X] (Added for percentiles implementation) Calculate and display key percentiles (P50, P95, P99).
+    *   [X] (Added for tests) Write unit tests for new statistical calculation methods.
+    *   [X] (Added for docs) Document new statistics in README.
 
 ## Phase 7: User Experience & Distribution
 
 ### 7.1. Code Packaging and Distribution
 *   **Objective:** Make the script easier to install and run for end-users.
 *   **Considerations:**
-    *   [ ] Create a `setup.py` or `pyproject.toml` file.
-    *   [ ] Define entry points so the script can be run as a command after installation (e.g., `netmonitor` instead of `python monitor_net.py`).
-    *   [ ] Consider packaging as a wheel and distributing on PyPI.
-    *   [ ] Update `README.md` with installation instructions.
+    *   [X] Create a `setup.py` or `pyproject.toml` file.
+    *   [X] Define entry points so the script can be run as a command after installation (e.g., `netmonitor` instead of `python monitor_net.py`).
+    *   [X] Consider packaging as a wheel and distributing on PyPI.
+    *   [X] Update `README.md` with installation instructions.
 
 ### 7.2. Interactive Commands (Advanced)
 *   **Objective:** Allow users to interact with the running monitor (e.g., pause, change settings).
@@ -172,9 +175,12 @@ This roadmap is a suggestion and can be adjusted as needed. It is recommended to
 ### 8.1. Enhanced Alerting
 *   **Objective:** More flexible and noticeable alerting mechanisms.
 *   **Considerations:**
-    *   [ ] Configurable alert thresholds (e.g., latency > X ms for Y consecutive pings).
+    *   [X] Configurable alert thresholds (e.g., latency > X ms for Y consecutive pings).
     *   [ ] Different alert types (e.g., visual change in graph, sound alert if possible and desired).
     *   [ ] Option for persistent alerts until acknowledged.
+    *   [X] (Added for implementation) Use configured threshold in `run()` loop.
+    *   [X] (Added for tests) Write unit tests for alert threshold logic.
+    *   [X] (Added for docs) Document configurable alert threshold in README.
 
 ### 8.2. Historical Data Viewing/Scrolling (Advanced)
 *   **Objective:** Allow users to view more than just the current screen of data points.
@@ -185,9 +191,9 @@ This roadmap is a suggestion and can be adjusted as needed. It is recommended to
 ### 8.3. Refine Flake8 E501s
 *   **Objective:** Further reduce or eliminate E501 (line too long) errors.
 *   **Considerations:**
-    *   [ ] Carefully re-wrap long docstrings and comments.
-    *   [ ] Break down complex f-strings or logical conditions further.
-    *   [ ] This is lower priority if it compromises readability of documentation.
+    *   [X] Carefully re-wrap long docstrings and comments.
+    *   [X] Break down complex f-strings or logical conditions further.
+    *   [X] This is lower priority if it compromises readability of documentation.
 
 This roadmap provides a comprehensive list of potential future enhancements.
 Priorities can be adjusted based on user feedback and development resources.
