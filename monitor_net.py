@@ -13,6 +13,7 @@ import csv  # For CSV logging
 from datetime import datetime  # For timestamping CSV entries
 import socket  # For resolving IP address for CSV logging
 import statistics  # For stdev and jitter calculations
+import signal # For pause/resume signal handling
 
 # Note: 'os' is imported near the top of the file already
 
@@ -85,6 +86,8 @@ class NetworkMonitor:
         self.consecutive_ping_failures: int = 0
         self.connection_status_message: str = ""
         self.total_monitoring_time_seconds: float = 0.0
+        self.is_paused: bool = False
+        self.pause_triggered_by_signal: bool = False
         self.original_terminal_settings = None
         self.current_os: str = ""  # Will be set before logger
         self.config_file_settings: dict = {}  # For settings from INI file
@@ -1057,12 +1060,75 @@ class NetworkMonitor:
                 "Skipping termios-based terminal settings restoration on Windows."
             )
 
+    def toggle_pause(self, signum, frame):
+        """
+        Signal handler to toggle the pause state of the monitor.
+        Manages cursor visibility and logs state changes.
+        """
+        self.is_paused = not self.is_paused
+        if self.is_paused:
+            self.pause_triggered_by_signal = True # Mark that pause was due to signal
+            # Show cursor and print Paused message immediately
+            # This ensures the user sees the cursor and message even if the main loop is slow to update
+            sys.stdout.write(ANSI_SHOW_CURSOR)
+            # Clear the current line and print "Paused"
+            # This might be tricky if plotext is active.
+            # A simple print might be best for now, or a more robust clear line.
+            # For now, let the main loop handle the "Paused..." message display consistently.
+            # self.connection_status_message = "INFO: Monitoring Paused. Send signal again to resume."
+            self.logger.info(f"Monitoring paused by signal {signum}.")
+            # The main loop will handle displaying "Paused..." and managing the screen.
+        else:
+            # self.pause_triggered_by_signal can be reset by the main loop once it acts on resume
+            self.logger.info(f"Monitoring resumed by signal {signum}.")
+            # Hide cursor again for monitoring
+            sys.stdout.write(ANSI_HIDE_CURSOR)
+            # The main loop should handle clearing any "Paused" message and redrawing.
+            # self.connection_status_message = "INFO: Monitoring Resumed."
+            # Mark that resume was triggered, so the main loop can clear screen/redraw
+            self.pause_triggered_by_signal = True # Re-use flag to indicate a signal just changed state
+
+        sys.stdout.flush()
+
     def run(self):
         """Runs the main monitoring loop."""
+        # Register signal handler for SIGUSR1 to toggle pause
+        try:
+            signal.signal(signal.SIGUSR1, self.toggle_pause)
+            self.logger.info(f"Registered SIGUSR1 handler. Send 'kill -SIGUSR1 {os.getpid()}' to pause/resume.")
+        except AttributeError:
+            self.logger.warning("signal.SIGUSR1 not available on this platform (likely Windows). Pause/resume via signal will not work.")
+        except Exception as e:
+            self.logger.error(f"Failed to register SIGUSR1 handler: {e}")
+
         self._setup_terminal()
         exit_code = EXIT_CODE_SUCCESS
         try:
             while True:
+                # --- Start of Pause/Resume Logic ---
+                if self.is_paused:
+                    if self.pause_triggered_by_signal: # First time after signal triggered pause
+                        sys.stdout.write(ANSI_CURSOR_HOME) # Move cursor to home
+                        sys.stdout.write("Monitoring Paused. Send signal again to resume.\n")
+                        # Optionally, clear rest of screen or status lines if they might interfere
+                        # For now, keep it simple. Ensure cursor is visible.
+                        sys.stdout.write(ANSI_SHOW_CURSOR)
+                        sys.stdout.flush()
+                        self.pause_triggered_by_signal = False # Acknowledge signal
+
+                    time.sleep(0.5)  # Sleep briefly and check pause state again
+                    continue  # Skip the rest of the monitoring loop
+
+                # If it was paused by a signal and is now resuming
+                if not self.is_paused and self.pause_triggered_by_signal:
+                    self.logger.info("Resuming monitoring...")
+                    sys.stdout.write(ANSI_HIDE_CURSOR) # Hide cursor for active monitoring
+                    # Clear the screen to remove "Paused" message and redraw UI
+                    self._clear_screen_and_position_cursor()
+                    # Potentially call self._update_display_and_status() once to redraw immediately
+                    # For now, let the normal loop redraw.
+                    self.pause_triggered_by_signal = False # Acknowledge signal
+                # --- End of Pause/Resume Logic ---
                 current_latency_real = self._measure_latency()
                 self.total_monitoring_time_seconds += self.ping_interval
 

@@ -2693,3 +2693,33 @@ def test_csv_file_closed_on_exit(mocker, mock_default_args):
         monitor.output_file_handle is None
     ), "output_file_handle should be None after closing"
     assert monitor.csv_writer is None, "csv_writer should be None after closing"
+
+
+def test_toggle_pause_state(monitor_instance_base, mocker):
+    monitor = monitor_instance_base
+    # The monitor_instance_base fixture already mocks logger.info, .warning etc.
+    # We can access it directly via monitor.logger.info for assert_any_call
+
+    # Initial state
+    assert not monitor.is_paused
+    assert not monitor.pause_triggered_by_signal
+
+    # Simulate first signal (pause)
+    # We pass None for signum and frame as they are not used by the method's logic
+    monitor.toggle_pause(None, None)
+    assert monitor.is_paused
+    assert monitor.pause_triggered_by_signal
+    # Check that logger.info was called with the pause message
+    monitor.logger.info.assert_any_call("Monitoring paused by signal None.")
+
+    # Reset pause_triggered_by_signal as the main loop would after processing pause
+    # This is to simulate the state before the next signal arrives.
+    monitor.pause_triggered_by_signal = False
+
+    # Simulate second signal (resume)
+    monitor.toggle_pause(None, None)
+    assert not monitor.is_paused
+    # toggle_pause sets this to True again on both pause and resume
+    assert monitor.pause_triggered_by_signal
+    # Check that logger.info was called with the resume message
+    monitor.logger.info.assert_any_call("Monitoring resumed by signal None.")

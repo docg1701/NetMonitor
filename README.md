@@ -25,6 +25,19 @@ Configuration is managed via CLI arguments or a `monitor_config.ini` file. The s
 * **Environment Setup Script:** Includes a `run_monitor.sh` script (for Linux/macOS/bash environments) to automatically create a Python virtual environment and install dependencies.
 * **User-Friendly Display:** Uses ANSI escape codes for a smoother, non-flickering display update and hides the cursor during operation (terminal feature handling is best on POSIX systems).
 
+### Pause and Resume
+The monitor can be paused and resumed using the `SIGUSR1` signal. This is useful if you need to temporarily stop monitoring without exiting the script.
+
+To pause or resume, send the `SIGUSR1` signal to the monitor's process ID (PID). You can find the PID using tools like `pgrep -f monitor_net.py` or `ps aux | grep monitor_net.py`.
+
+Example command to send the signal:
+```bash
+kill -SIGUSR1 <PID>
+```
+Replace `<PID>` with the actual process ID.
+
+*Note: This feature is generally available on Linux and macOS. It may not be available on Windows due to differences in signal handling.*
+
 ## Platform Compatibility
 
 This tool is designed to run on:
