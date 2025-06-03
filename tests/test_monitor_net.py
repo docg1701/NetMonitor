@@ -5,14 +5,11 @@ import argparse
 from unittest.mock import MagicMock, call
 import sys
 import os
-import time
 
 # Import real termios for termios.TCSADRAIN constant
 import termios as real_termios  # Renamed to avoid conflict if 'termios' is mocked
 import configparser
 import socket  # Added for test_csv_init_dns_failure
-import csv  # Added for test_csv_write_row_success and others
-import platform  # Added for test_csv_file_closed_on_exit
 import statistics  # For stdev, jitter, and percentile test calculations
 
 # Add the parent directory to sys.path to allow direct import of monitor_net
@@ -213,9 +210,9 @@ def test_measure_latency_success_os_specific(
     mock_subprocess_run = mocker.patch("subprocess.run", return_value=mock_proc_result)
 
     result = monitor_instance_os._measure_latency()
-    assert (
-        result == expected_latency
-    ), f"Failed for OS {monitor_instance_os.TEST_OS_NAME}"
+    assert result == expected_latency, (
+        f"Failed for OS {monitor_instance_os.TEST_OS_NAME}"
+    )
 
     called_command = mock_subprocess_run.call_args[0][0]
     assert called_command[0 : len(cmd_start)] == cmd_start
@@ -468,9 +465,8 @@ def test_main_invalid_yticks(mocker):
 # --- Integration Test for run() method (using monitor_instance_base) ---
 
 
-# Renamed from TestLoopIntegrationExit to avoid pytest collection warning
-class LoopIntegrationControlSignal(Exception):
-    pass
+# LoopIntegrationControlSignal is already defined near the top of the file.
+# Removing this redundant definition.
 
 
 def test_network_monitor_run_loop_basic_iterations(monitor_instance_base, mocker):
@@ -488,15 +484,15 @@ def test_network_monitor_run_loop_basic_iterations(monitor_instance_base, mocker
 
     mock_update_display = mocker.patch.object(
         monitor_instance_base, "_update_display_and_status", autospec=True
-    )
+    )  # noqa: F841
     mock_setup_terminal = mocker.patch.object(
         monitor_instance_base, "_setup_terminal", autospec=True
-    )
+    )  # noqa: F841
     mock_restore_terminal = mocker.patch.object(
         monitor_instance_base, "_restore_terminal", autospec=True
     )
-    mock_time_sleep = mocker.patch("time.sleep", autospec=True)
-    mock_sys_exit = mocker.patch("sys.exit", side_effect=SystemExit)
+    mock_time_sleep = mocker.patch("time.sleep", autospec=True)  # noqa: F841
+    mock_sys_exit = mocker.patch("sys.exit", side_effect=SystemExit)  # noqa: F841
 
     logged_exception_details = []
 
@@ -564,7 +560,7 @@ def test_network_monitor_run_loop_basic_iterations(monitor_instance_base, mocker
 )
 def test_setup_terminal_os_awareness(monitor_instance_os, mocker):
     mock_stdout_write = mocker.patch("sys.stdout.write")
-    mock_fileno = mocker.patch("sys.stdin.fileno", return_value=0)
+    _mock_fileno = mocker.patch("sys.stdin.fileno", return_value=0)
 
     mock_tcgetattr = None
     if monitor_instance_os.TEST_OS_NAME != "windows":
@@ -600,7 +596,7 @@ def test_setup_terminal_os_awareness(monitor_instance_os, mocker):
 )
 def test_restore_terminal_os_awareness(monitor_instance_os, mocker):
     mock_stdout_write = mocker.patch("sys.stdout.write")
-    mock_fileno = mocker.patch("sys.stdin.fileno", return_value=0)
+    _mock_fileno = mocker.patch("sys.stdin.fileno", return_value=0)
 
     if monitor_instance_os.TEST_OS_NAME != "windows":
         mock_termios_module = mocker.patch("monitor_net.termios", spec=real_termios)
@@ -1141,7 +1137,7 @@ def test_main_catches_config_validation_error(mocker):
         "Configuration Error: mock validation error from init\n"
     )
     mock_sys_exit.assert_called_once_with(EXIT_CODE_ERROR)
-    assert excinfo.type == SystemExit  # Check that SystemExit was indeed raised
+    assert excinfo.type is SystemExit  # Check that SystemExit was indeed raised
 
 
 # --- Tests for CSV Output File Argument Parsing and Precedence ---
@@ -1277,9 +1273,9 @@ def test_output_file_arg_parsing_cli_overrides_config(mocker, mock_default_args)
 
     assert config_log_idx != -1, "Config usage log not found"
     assert cli_override_log_idx != -1, "CLI override log not found"
-    assert (
-        cli_override_log_idx > config_log_idx
-    ), "CLI override log should appear after config usage log"
+    assert cli_override_log_idx > config_log_idx, (
+        "CLI override log should appear after config usage log"
+    )
 
 
 def test_output_file_arg_parsing_default_is_none(mocker, mock_default_args):
@@ -1610,19 +1606,19 @@ def test_percentiles_invalid_percentile_values(monitor_instance_base):
     # Check for warning logs for each invalid percentile
     log_calls = monitor_instance_base.logger.warning.call_args_list
     assert any(
-        f"Requested percentile 0.0 is outside the (0,1) exclusive range" in str(call)
+        "Requested percentile 0.0 is outside the (0,1) exclusive range" in str(call)
         for call in log_calls
     )
     assert any(
-        f"Requested percentile 1.0 is outside the (0,1) exclusive range" in str(call)
+        "Requested percentile 1.0 is outside the (0,1) exclusive range" in str(call)
         for call in log_calls
     )
     assert any(
-        f"Requested percentile -0.1 is outside the (0,1) exclusive range" in str(call)
+        "Requested percentile -0.1 is outside the (0,1) exclusive range" in str(call)
         for call in log_calls
     )
     assert any(
-        f"Requested percentile 1.1 is outside the (0,1) exclusive range" in str(call)
+        "Requested percentile 1.1 is outside the (0,1) exclusive range" in str(call)
         for call in log_calls
     )
 
@@ -1973,13 +1969,13 @@ def test_run_loop_alert_triggers_with_custom_threshold(mocker, mock_default_args
                 # Check that previous call was the warning for (threshold-1) failures if threshold > 1
                 if custom_alert_threshold > 1:
                     assert (
-                        f"Warning: Ping to {monitor.host} failed ({custom_alert_threshold-1}x)"
+                        f"Warning: Ping to {monitor.host} failed ({custom_alert_threshold - 1}x)"
                         in warning_log_calls[i - 1]
                     )
                 break
-        assert (
-            alert_call_found
-        ), "Specific ALERT message not found in the expected sequence."
+        assert alert_call_found, (
+            "Specific ALERT message not found in the expected sequence."
+        )
 
     assert monitor.consecutive_ping_failures == custom_alert_threshold
     mock_restore_terminal.assert_called_once()  # Ensure cleanup happened
@@ -2312,7 +2308,7 @@ def test_csv_init_new_file(mocker, mock_default_args):
             return False  # This is a new CSV file
         return True  # Default for other paths if any (shouldn't matter here)
 
-    mock_os_path_exists = mocker.patch(
+    _mock_os_path_exists = mocker.patch(
         "monitor_net.os.path.exists", side_effect=exists_side_effect_new_csv
     )
 
@@ -2369,7 +2365,7 @@ def test_csv_init_existing_empty_file(mocker, mock_default_args):
     mocker.patch("monitor_net.csv.writer", return_value=mock_csv_writer_obj)
     mocker.patch("monitor_net.socket.gethostbyname", return_value="1.2.3.4")
 
-    monitor = NetworkMonitor(mock_default_args)
+    monitor = NetworkMonitor(mock_default_args)  # noqa: F841
 
     mock_open_func.assert_called_once_with(
         test_csv_path, "a", newline="", encoding="utf-8"
@@ -2406,7 +2402,7 @@ def test_csv_init_existing_non_empty_file(mocker, mock_default_args):
     mocker.patch("monitor_net.csv.writer", return_value=mock_csv_writer_obj)
     mocker.patch("monitor_net.socket.gethostbyname", return_value="1.2.3.4")
 
-    monitor = NetworkMonitor(mock_default_args)
+    monitor = NetworkMonitor(mock_default_args)  # noqa: F841
 
     mock_open_func.assert_called_once_with(
         test_csv_path, "a", newline="", encoding="utf-8"
@@ -2563,7 +2559,7 @@ def test_csv_write_io_error(mocker, mock_default_args):
     mocker.patch("monitor_net.os.path.exists", side_effect=exists_side_effect_io_error)
     mocker.patch("monitor_net.socket.gethostbyname", return_value="1.2.3.4")
     # This open is for the CSV file which will fail
-    mock_open_func = mocker.patch("builtins.open", mocker.mock_open())
+    _mock_open_func = mocker.patch("builtins.open", mocker.mock_open())
 
     # This is the writer instance that would be created if open succeeded
     mock_csv_writer_instance = MagicMock()
@@ -2663,12 +2659,12 @@ def test_csv_file_closed_on_exit(mocker, mock_default_args):
     monitor = NetworkMonitor(mock_default_args)
 
     # --- Pre-conditions for _restore_terminal ---
-    assert (
-        monitor.output_file_handle is mock_file_handle
-    ), "output_file_handle was not set to the mocked file handle during __init__"
-    assert (
-        monitor.output_file_path == "test_close.csv"
-    ), "output_file_path was not correctly set"
+    assert monitor.output_file_handle is mock_file_handle, (
+        "output_file_handle was not set to the mocked file handle during __init__"
+    )
+    assert monitor.output_file_path == "test_close.csv", (
+        "output_file_path was not correctly set"
+    )
     original_path_for_log = monitor.output_file_path
 
     mocker.patch("sys.stdout.write")
@@ -2681,17 +2677,17 @@ def test_csv_file_closed_on_exit(mocker, mock_default_args):
     monitor._restore_terminal()
 
     # --- Assertions ---
-    assert (
-        len(close_called_tracker) == 1
-    ), "close_side_effect was not called exactly once"
+    assert len(close_called_tracker) == 1, (
+        "close_side_effect was not called exactly once"
+    )
     assert close_called_tracker[0] is True, "close_side_effect did not append True"
 
     mock_logger_instance.info.assert_any_call(
         f"Closing CSV output file: {original_path_for_log}"
     )
-    assert (
-        monitor.output_file_handle is None
-    ), "output_file_handle should be None after closing"
+    assert monitor.output_file_handle is None, (
+        "output_file_handle should be None after closing"
+    )
     assert monitor.csv_writer is None, "csv_writer should be None after closing"
 
 

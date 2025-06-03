@@ -60,5 +60,5 @@ line-length = 88
 [tool.ruff.lint]
 # Define the rules to explicitly ignore.
 # E203: whitespace before ':' (often handled by Black)
-# W503: line break before binary operator (PEP 8 now recommends after, Black enforces this)
-ignore = ["E203", "W503"]
+# W503: line break before binary operator (PEP 8 now recommends after, Black enforces this) - Handled by Ruff's formatter or default rules.
+ignore = ["E203"]

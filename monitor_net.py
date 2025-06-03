@@ -13,7 +13,7 @@ import csv  # For CSV logging
 from datetime import datetime  # For timestamping CSV entries
 import socket  # For resolving IP address for CSV logging
 import statistics  # For stdev and jitter calculations
-import signal # For pause/resume signal handling
+import signal  # For pause/resume signal handling
 
 # Note: 'os' is imported near the top of the file already
 
@@ -229,9 +229,7 @@ class NetworkMonitor:
             cfg_output_file is not None and cfg_output_file.strip()
         ):  # Ensure not empty string
             final_output_file = cfg_output_file.strip()
-            log_message = (
-                "Using 'output_file' from config file: " f"{final_output_file}"
-            )
+            log_message = f"Using 'output_file' from config file: {final_output_file}"
             self.logger.info(log_message)
 
         cfg_alert_threshold_str = self.config_file_settings.get("alert_threshold")
@@ -274,7 +272,7 @@ class NetworkMonitor:
         if cli_args.output_file is not None:
             final_output_file = cli_args.output_file
             log_message = (
-                f"CLI 'output_file' ({final_output_file}) " "overrides other settings."
+                f"CLI 'output_file' ({final_output_file}) overrides other settings."
             )
             self.logger.info(log_message)
 
@@ -555,8 +553,7 @@ class NetworkMonitor:
 
             if plot_height < PLOT_MIN_HEIGHT_LINES or plot_width < PLOT_MIN_WIDTH_CHARS:
                 warn_msg = (
-                    "Calculated plot area is too small. "
-                    "Graph might not display well."
+                    "Calculated plot area is too small. Graph might not display well."
                 )
                 self.logger.warning(warn_msg)
             return plot_height, plot_width
@@ -1067,7 +1064,7 @@ class NetworkMonitor:
         """
         self.is_paused = not self.is_paused
         if self.is_paused:
-            self.pause_triggered_by_signal = True # Mark that pause was due to signal
+            self.pause_triggered_by_signal = True  # Mark that pause was due to signal
             # Show cursor and print Paused message immediately
             # This ensures the user sees the cursor and message even if the main loop is slow to update
             sys.stdout.write(ANSI_SHOW_CURSOR)
@@ -1086,7 +1083,9 @@ class NetworkMonitor:
             # The main loop should handle clearing any "Paused" message and redrawing.
             # self.connection_status_message = "INFO: Monitoring Resumed."
             # Mark that resume was triggered, so the main loop can clear screen/redraw
-            self.pause_triggered_by_signal = True # Re-use flag to indicate a signal just changed state
+            self.pause_triggered_by_signal = (
+                True  # Re-use flag to indicate a signal just changed state
+            )
 
         sys.stdout.flush()
 
@@ -1095,9 +1094,13 @@ class NetworkMonitor:
         # Register signal handler for SIGUSR1 to toggle pause
         try:
             signal.signal(signal.SIGUSR1, self.toggle_pause)
-            self.logger.info(f"Registered SIGUSR1 handler. Send 'kill -SIGUSR1 {os.getpid()}' to pause/resume.")
+            self.logger.info(
+                f"Registered SIGUSR1 handler. Send 'kill -SIGUSR1 {os.getpid()}' to pause/resume."
+            )
         except AttributeError:
-            self.logger.warning("signal.SIGUSR1 not available on this platform (likely Windows). Pause/resume via signal will not work.")
+            self.logger.warning(
+                "signal.SIGUSR1 not available on this platform (likely Windows). Pause/resume via signal will not work."
+            )
         except Exception as e:
             self.logger.error(f"Failed to register SIGUSR1 handler: {e}")
 
@@ -1107,14 +1110,18 @@ class NetworkMonitor:
             while True:
                 # --- Start of Pause/Resume Logic ---
                 if self.is_paused:
-                    if self.pause_triggered_by_signal: # First time after signal triggered pause
-                        sys.stdout.write(ANSI_CURSOR_HOME) # Move cursor to home
-                        sys.stdout.write("Monitoring Paused. Send signal again to resume.\n")
+                    if (
+                        self.pause_triggered_by_signal
+                    ):  # First time after signal triggered pause
+                        sys.stdout.write(ANSI_CURSOR_HOME)  # Move cursor to home
+                        sys.stdout.write(
+                            "Monitoring Paused. Send signal again to resume.\n"
+                        )
                         # Optionally, clear rest of screen or status lines if they might interfere
                         # For now, keep it simple. Ensure cursor is visible.
                         sys.stdout.write(ANSI_SHOW_CURSOR)
                         sys.stdout.flush()
-                        self.pause_triggered_by_signal = False # Acknowledge signal
+                        self.pause_triggered_by_signal = False  # Acknowledge signal
 
                     time.sleep(0.5)  # Sleep briefly and check pause state again
                     continue  # Skip the rest of the monitoring loop
@@ -1122,12 +1129,14 @@ class NetworkMonitor:
                 # If it was paused by a signal and is now resuming
                 if not self.is_paused and self.pause_triggered_by_signal:
                     self.logger.info("Resuming monitoring...")
-                    sys.stdout.write(ANSI_HIDE_CURSOR) # Hide cursor for active monitoring
+                    sys.stdout.write(
+                        ANSI_HIDE_CURSOR
+                    )  # Hide cursor for active monitoring
                     # Clear the screen to remove "Paused" message and redraw UI
                     self._clear_screen_and_position_cursor()
                     # Potentially call self._update_display_and_status() once to redraw immediately
                     # For now, let the normal loop redraw.
-                    self.pause_triggered_by_signal = False # Acknowledge signal
+                    self.pause_triggered_by_signal = False  # Acknowledge signal
                 # --- End of Pause/Resume Logic ---
                 current_latency_real = self._measure_latency()
                 self.total_monitoring_time_seconds += self.ping_interval
