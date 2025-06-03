@@ -6,10 +6,10 @@ This document outlines the implementation plan for the suggested improvements to
 
 ### 1.1. Code Style Consistency
 * **Objective:** Ensure clean, readable, and standardized code.
-* **Tools:** `flake8` for linting, `black` for formatting.
+* **Tools:** `ruff` for linting and formatting.
 * **Steps:**
-    * [X] Install `flake8` and `black` in the development environment (`pip install flake8 black`).
-    * [X] Run `flake8 monitor_net.py` and fix all reported warnings and errors.
+    * [X] Install `ruff` and `black` in the development environment (`pip install ruff black`).
+    * [X] Run `ruff check monitor_net.py` and fix all reported warnings and errors.
     * [X] Run `black monitor_net.py` to format the code automatically.
     * [X] Add a configuration file for `flake8` (e.g., `.flake8`) if customizations are needed. (Superseded by ruff configuration in `pyproject.toml`)
     * [X] Consider adding a pre-commit hook (e.g., with `pre-commit`) to automate style checking before each commit. (Ruff hooks for linting and formatting added in `.pre-commit-config.yaml`)
