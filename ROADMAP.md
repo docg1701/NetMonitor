@@ -147,7 +147,7 @@ This roadmap is a suggestion and can be adjusted as needed. It is recommended to
 *   **Considerations:**
     *   [X] Calculate standard deviation to show variability.
     *   [X] Calculate jitter (variation in latency between pings).
-    *   [ ] Show a histogram or percentile distribution of latencies over the session. (Percentiles implemented)
+    *   [X] Show a histogram or percentile distribution of latencies over the session. (Percentiles implemented)
     *   [X] Track packet loss percentage more explicitly.
     *   [X] (Added for percentiles implementation) Calculate and display key percentiles (P50, P95, P99).
     *   [X] (Added for tests) Write unit tests for new statistical calculation methods.
@@ -194,6 +194,7 @@ This roadmap is a suggestion and can be adjusted as needed. It is recommended to
     *   [X] Carefully re-wrap long docstrings and comments.
     *   [X] Break down complex f-strings or logical conditions further.
     *   [X] This is lower priority if it compromises readability of documentation.
+    *   [!] Note: Persistent E501 (line too long) errors exist due to conflicts between `black` auto-formatting and `flake8`'s 88-character limit. Some lines that `black` formats to be >88 chars are currently unaddressed. Manual application of `# noqa: E501` is needed after `black` runs, which is challenging with current automated pre-commit hooks.
 
 This roadmap provides a comprehensive list of potential future enhancements.
 Priorities can be adjusted based on user feedback and development resources.
