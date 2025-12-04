@@ -856,29 +856,21 @@ class NetworkMonitor:
 
     def _calculate_jitter(self) -> float | None:
         """
-        Calculates jitter as the standard deviation of the differences
-        between consecutive valid latencies.
+        Calculates jitter using the RFC 1889 smoothed variance algorithm:
+        J(i) = J(i-1) + (|D(i-1,i)| - J(i-1)) / 16
         """
         valid_latencies = [
             val for val in self.latency_history_real_values if val is not None
         ]
-        if len(valid_latencies) < 2:  # Need at least 2 latencies for 1 difference
+        if len(valid_latencies) < 2:
             return None
 
-        diffs = [
-            valid_latencies[i] - valid_latencies[i - 1]
-            for i in range(1, len(valid_latencies))
-        ]
+        jitter = 0.0
+        for i in range(1, len(valid_latencies)):
+            diff = abs(valid_latencies[i] - valid_latencies[i - 1])
+            jitter += (diff - jitter) / 16.0
 
-        if len(diffs) < 2:  # stdev requires at least 2 differences
-            # This means we need at least 3 valid latencies initially
-            return None
-
-        try:
-            return statistics.stdev(diffs)
-        except statistics.StatisticsError as e:
-            self.logger.warning(f"Could not calculate jitter: {e}")
-            return None
+        return jitter
 
     def _calculate_packet_loss_percentage(self) -> float | None:
         """Calculates the percentage of lost packets."""

@@ -1,27 +1,15 @@
-#container {
-  text-align: center;
-
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
+.chart-container {
+  position: relative;
+  height: 40vh;
+  width: 100%;
 }
 
-#container strong {
-  font-size: 20px;
-  line-height: 26px;
+ion-card-title {
+  font-size: 1.5rem;
+  font-weight: bold;
 }
 
-#container p {
-  font-size: 16px;
-  line-height: 22px;
-
-  color: #8c8c8c;
-
-  margin: 0;
-}
-
-#container a {
-  text-decoration: none;
+ion-card-subtitle {
+  text-transform: uppercase;
+  font-size: 0.8rem;
 }
