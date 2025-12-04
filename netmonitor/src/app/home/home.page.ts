@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
@@ -20,7 +20,9 @@ Chart.register(...registerables);
 export class HomePage implements OnInit, OnDestroy {
   @ViewChild(BaseChartDirective) chart?: BaseChartDirective;
 
-  monitorService = inject(MonitorService);results: PingResult[] = [];
+  monitorService = inject(MonitorService);
+  cd = inject(ChangeDetectorRef);
+  results: PingResult[] = [];
   subscription: Subscription | null = null;
   isMonitoring = false;
 
@@ -64,6 +66,7 @@ export class HomePage implements OnInit, OnDestroy {
       this.results = results;
       this.updateStats(results);
       this.updateChart(results);
+      this.cd.detectChanges(); // Force UI update
     });
     
     // Auto-start for convenience or per requirement? 
@@ -104,11 +107,13 @@ export class HomePage implements OnInit, OnDestroy {
     const latencies = validResults.map(r => r.latencyMs as number);
 
     if (latencies.length > 0) {
-      this.stats.current = latencies[latencies.length - 1];
-      this.stats.avg = latencies.reduce((a, b) => a + b, 0) / latencies.length;
-      this.stats.min = Math.min(...latencies);
-      this.stats.max = Math.max(...latencies);
-      this.stats.jitter = this.calculateJitter(latencies);
+      this.stats = {
+        current: latencies[latencies.length - 1],
+        avg: latencies.reduce((a, b) => a + b, 0) / latencies.length,
+        min: Math.min(...latencies),
+        max: Math.max(...latencies),
+        jitter: this.calculateJitter(latencies)
+      };
     } else {
       this.stats = { current: 0, avg: 0, min: 0, max: 0, jitter: 0 };
     }

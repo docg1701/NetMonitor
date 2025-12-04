@@ -68,5 +68,38 @@
     "karma-jasmine-html-reporter": "~2.1.0",
     "typescript": "~5.9.0"
   },
-  "description": "An Ionic project"
+  "description": "An Ionic project",
+  "build": {
+    "appId": "io.ionic.starter",
+    "productName": "NetMonitor",
+    "files": [
+      "www/**/*",
+      "electron/**/*",
+      "package.json",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!**/node_modules/*.d.ts",
+      "!**/node_modules/.bin",
+      "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
+      "!.editorconfig",
+      "!**/._*",
+      "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
+      "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}",
+      "!**/{appveyor.yml,.travis.yml,circle.yml}",
+      "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}",
+      "!**/node_modules/@rollup/rollup-darwin-arm64",
+      "!**/node_modules/@rollup/rollup-darwin-x64",
+      "!**/node_modules/@rollup/rollup-linux-arm64-gnu",
+      "!**/node_modules/@rollup/rollup-linux-arm64-musl",
+      "!**/node_modules/@rollup/rollup-win32-arm64-msvc",
+      "!**/node_modules/@rollup/rollup-win32-ia32-msvc",
+      "!**/node_modules/@rollup/rollup-win32-x64-msvc"
+    ],
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Utility"
+    }
+  }
 }

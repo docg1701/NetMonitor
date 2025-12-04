@@ -1,15 +1,22 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Virtualenv
-.venv_monitor_net/
-
-# Distribution / packaging
-build/
+# Build
 dist/
-*.egg-info/
+www/
+node_modules/
+out/
+.angular/
 
-# Data files
+# System
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
 latency_log.csv
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary
+tmp/
+temp/
