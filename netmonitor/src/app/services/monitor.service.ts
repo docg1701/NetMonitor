@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { BehaviorSubject, Observable, Subscription, timer, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
@@ -11,8 +11,7 @@ import { environment } from '../../environments/environment'; // Import environm
 export class MonitorService {
   private pingResults$ = new BehaviorSubject<PingResult[]>([]);
   private timerSubscription: Subscription | null = null;
-
-  constructor(private http: HttpClient) {}
+  private http = inject(HttpClient);
 
   get results$(): Observable<PingResult[]> {
     return this.pingResults$.asObservable();

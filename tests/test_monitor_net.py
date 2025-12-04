@@ -1431,9 +1431,10 @@ def test_jitter_one_data_point(monitor_instance_base):
 
 
 def test_jitter_two_data_points(monitor_instance_base):
-    # Needs 2 differences (i.e., 3 data points) for stdev of differences
+    # RFC 1889 can calculate with 2 points (1 diff)
     monitor_instance_base.latency_history_real_values = [10.0, 12.0]
-    assert monitor_instance_base._calculate_jitter() is None
+    # J1 = 0 + (|12-10| - 0)/16 = 0.125
+    assert monitor_instance_base._calculate_jitter() == pytest.approx(0.125)
 
 
 def test_jitter_three_data_points_constant(monitor_instance_base):
@@ -1446,9 +1447,12 @@ def test_jitter_three_data_points_constant(monitor_instance_base):
 
 
 def test_jitter_three_data_points_varying(monitor_instance_base):
-    latencies = [10.0, 15.0, 12.0]  # Diffs: [5, -3]
+    latencies = [10.0, 15.0, 12.0]  # Diffs: |5|, |3|
     monitor_instance_base.latency_history_real_values = latencies
-    expected_jitter = statistics.stdev([5.0, -3.0])
+    # RFC 1889 Calculation:
+    # J1 = 0 + (|15-10| - 0)/16 = 5/16 = 0.3125
+    # J2 = 0.3125 + (|12-15| - 0.3125)/16 = 0.3125 + 2.6875/16 = 0.48046875
+    expected_jitter = 0.48046875
     assert monitor_instance_base._calculate_jitter() == pytest.approx(expected_jitter)
 
 
@@ -1462,26 +1466,14 @@ def test_jitter_with_nones(monitor_instance_base):
         20.0,
     ]
     # Valid latencies: [10.0, 15.0, 12.0, 20.0]
-    # Diffs: [5.0, -3.0, 8.0]
-    expected_jitter = statistics.stdev([5.0, -3.0, 8.0])
+    # From previous test, Jitter after 12.0 is 0.48046875
+    # Next: |20-12| = 8
+    # J3 = 0.48046875 + (8 - 0.48046875)/16 = 0.950439453125
+    expected_jitter = 0.950439453125
     assert monitor_instance_base._calculate_jitter() == pytest.approx(expected_jitter)
 
 
-def test_jitter_statistics_error(monitor_instance_base, mocker):
-    """Test that StatisticsError is caught and returns None for jitter."""
-    mocker.patch(
-        "statistics.stdev", side_effect=statistics.StatisticsError("mock error")
-    )
-    monitor_instance_base.latency_history_real_values = [
-        10.0,
-        20.0,
-        30.0,
-    ]  # Enough points to pass initial checks
-    result = monitor_instance_base._calculate_jitter()
-    assert result is None
-    monitor_instance_base.logger.warning.assert_called_once_with(
-        "Could not calculate jitter: mock error"
-    )
+
 
 
 def test_packet_loss_no_pings(monitor_instance_base):
