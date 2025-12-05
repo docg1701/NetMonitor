@@ -12,7 +12,9 @@
     "test": "ng test",
     "lint": "ng lint",
     "electron:start": "ng build && electron .",
-    "android:run": "ionic cap run android"
+    "android:run": "ionic cap run android",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev"
   },
   "private": true,
   "dependencies": {
@@ -31,6 +33,7 @@
     "@capacitor/keyboard": "7.0.3",
     "@capacitor/status-bar": "7.0.3",
     "@ionic/angular": "^8.0.0",
+    "@tauri-apps/api": "^2.9.1",
     "chart.js": "^4.5.1",
     "ionicons": "^7.0.0",
     "ng2-charts": "^8.0.0",
@@ -50,6 +53,7 @@
     "@angular/language-service": "^21.0.0",
     "@capacitor/cli": "7.4.4",
     "@ionic/angular-toolkit": "^12.0.0",
+    "@tauri-apps/cli": "^2.9.5",
     "@types/jasmine": "~5.1.0",
     "@typescript-eslint/eslint-plugin": "^8.18.0",
     "@typescript-eslint/parser": "^8.18.0",
