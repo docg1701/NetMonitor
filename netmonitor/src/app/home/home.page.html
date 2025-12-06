@@ -3,6 +3,11 @@
     <ion-title>
       NetMonitor
     </ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="toggleTheme()">
+        <ion-icon slot="icon-only" [name]="isDark ? 'sunny-outline' : 'moon-outline'"></ion-icon>
+      </ion-button>
+    </ion-buttons>
     <ion-badge slot="end" [color]="isMonitoring ? 'success' : 'medium'" class="ion-margin-end">
       {{ isMonitoring ? 'ONLINE' : 'OFFLINE' }}
     </ion-badge>

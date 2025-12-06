@@ -2,6 +2,8 @@ import { Component, OnInit, OnDestroy, ViewChild, inject, ChangeDetectorRef } fr
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
+import { addIcons } from 'ionicons';
+import { sunnyOutline, moonOutline } from 'ionicons/icons';
 import { BaseChartDirective } from 'ng2-charts';
 import { ChartConfiguration, ChartOptions, ChartType, Chart, registerables } from 'chart.js';
 import { Subscription } from 'rxjs';
@@ -25,6 +27,11 @@ export class HomePage implements OnInit, OnDestroy {
   results: PingResult[] = [];
   subscription: Subscription | null = null;
   isMonitoring = false;
+  isDark = false;
+
+  constructor() {
+    addIcons({ sunnyOutline, moonOutline });
+  }
 
   stats = {
     current: 0,
@@ -62,13 +69,44 @@ export class HomePage implements OnInit, OnDestroy {
 
 
   ngOnInit() {
-    this.updateChartTheme(); // Apply theme colors
+    // Load theme preference
+    const savedTheme = localStorage.getItem('netmonitor-theme');
+    if (savedTheme === 'dark') {
+      this.isDark = true;
+      document.body.classList.add('ion-palette-dark');
+    } else {
+      this.isDark = false;
+      document.body.classList.remove('ion-palette-dark');
+    }
+
+    // Wait for style application
+    setTimeout(() => {
+      this.updateChartTheme(); 
+    }, 0);
+
     this.subscription = this.monitorService.results$.subscribe(results => {
       this.results = results;
       this.updateStats(results);
       this.updateChart(results);
       this.cd.detectChanges(); // Force UI update
     });
+  }
+
+  toggleTheme() {
+    this.isDark = !this.isDark;
+    if (this.isDark) {
+      document.body.classList.add('ion-palette-dark');
+      localStorage.setItem('netmonitor-theme', 'dark');
+    } else {
+      document.body.classList.remove('ion-palette-dark');
+      localStorage.setItem('netmonitor-theme', 'light');
+    }
+    
+    // Allow CSS to propagate before reading variables
+    setTimeout(() => {
+        this.updateChartTheme();
+        this.chart?.update(); 
+    }, 100);
   }
 
   private updateChartTheme() {
