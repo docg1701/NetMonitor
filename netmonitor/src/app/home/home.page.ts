@@ -42,8 +42,8 @@ export class HomePage implements OnInit, OnDestroy {
         label: 'Latency (ms)',
         fill: true,
         tension: 0.5,
-        borderColor: 'rgba(148,159,177,1)',
-        backgroundColor: 'rgba(148,159,177,0.2)'
+        borderColor: 'rgba(148,159,177,1)', // Default fallback
+        backgroundColor: 'rgba(148,159,177,0.2)' // Default fallback
       }
     ]
   };
@@ -62,19 +62,26 @@ export class HomePage implements OnInit, OnDestroy {
 
 
   ngOnInit() {
+    this.updateChartTheme(); // Apply theme colors
     this.subscription = this.monitorService.results$.subscribe(results => {
       this.results = results;
       this.updateStats(results);
       this.updateChart(results);
       this.cd.detectChanges(); // Force UI update
     });
-    
-    // Auto-start for convenience or per requirement? 
-    // Story AC 5 says "Start/Stop button controls the monitoring service", implies manual start or default state.
-    // Story 1.2 said "Start monitoring" was part of service, but here we drive it.
-    // I'll leave it stopped by default as per typical UI patterns unless specified "Auto-start".
-    // Wait, Story AC 2 says "Dark Mode theme applied...".
-    // Let's just initialize.
+  }
+
+  private updateChartTheme() {
+    const style = getComputedStyle(document.body);
+    const lineColor = style.getPropertyValue('--chart-line-color').trim();
+    const fillColor = style.getPropertyValue('--chart-fill-color').trim();
+
+    if (lineColor) {
+      this.lineChartData.datasets[0].borderColor = lineColor;
+    }
+    if (fillColor) {
+      this.lineChartData.datasets[0].backgroundColor = fillColor;
+    }
   }
 
   ngOnDestroy() {
