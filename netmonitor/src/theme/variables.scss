@@ -77,6 +77,9 @@
   /* App Custom Variables */
   --chart-line-color: #3880ff;
   --chart-fill-color: rgba(56, 128, 255, 0.2);
+  
+  --stat-card-title-color: #000000;
+  --stat-card-subtitle-color: #666666;
 }
 
 /* Dark Theme (Applied via class) */
@@ -160,8 +163,9 @@
 
   --ion-item-background: #1e1e1e;
   --ion-card-background: #1e1e1e;
-  --ion-card-title-color: #ffffff;
-  --ion-card-subtitle-color: #ffffff;
+  
+  --stat-card-title-color: #ffffff;
+  --stat-card-subtitle-color: #e0e0e0;
 
   /* Chart Variables (Inherit or Override) */
   --chart-line-color: rgba(148, 159, 177, 1);
