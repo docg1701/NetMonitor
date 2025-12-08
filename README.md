@@ -68,5 +68,8 @@ npx cap sync
 npx cap open android
 ```
 
+### Release Process
+See [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md) for instructions on creating and publishing new releases.
+
 ## License
 [MIT License](LICENSE)
