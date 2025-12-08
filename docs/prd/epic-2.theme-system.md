@@ -6,10 +6,10 @@ Implement a robust Light/Dark theme system with user control, allowing users to 
 ## Stories
 - **Story 2.1**: CSS Variable Refactoring
     - **Goal**: Refactor existing hardcoded colors into CSS variables to support dynamic theming.
-    - **Status**: Draft (docs/stories/2.1.css-variable-refactoring.story.md)
+    - **Status**: Done (docs/stories/2.1.css-variable-refactoring.story.md)
 - **Story 2.2**: Theme Toggle & Persistence
     - **Goal**: Implement the UI control to switch themes and persist the user's choice.
-    - **Status**: Pending
+    - **Status**: Done (docs/stories/2.2.theme-toggle-and-persistence.story.md)
 
 ## Key Requirements
 - **Theme Support**:
