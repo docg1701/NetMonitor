@@ -23,11 +23,12 @@ This application is rewritten using Angular, Ionic, Capacitor, and Tauri to ensu
 
 ## Tech Stack
 
-*   **Frontend:** Angular v21+
-*   **UI Framework:** Ionic Framework v8+
-*   **Runtime (Desktop):** Tauri v2 (Rust backend)
-*   **Runtime (Mobile):** Capacitor v7+
-*   **Charts:** Chart.js with ng2-charts
+*   **Frontend:** Angular v21.0.0
+*   **UI Framework:** Ionic Framework v8.0.0
+*   **Runtime (Desktop):** Tauri v2.9.4 (Rust backend)
+*   **Runtime (Mobile):** Capacitor v7.4.4
+*   **Charts:** Chart.js v4.5.1 with ng2-charts v8.0.0
+*   **Rust Dependencies:** reqwest v0.12, serde v1.0, tauri-plugin-log/shell/store v2
 
 ## Installation & Usage
 
@@ -64,10 +65,11 @@ This works on Linux Mint, Ubuntu, and other distributions using XDG desktop stan
 ## Development
 
 ### Prerequisites
-*   Node.js (v20 or higher)
-*   Rust (latest stable)
+*   Node.js v20 or higher
+*   Rust v1.77.2 or higher (latest stable recommended)
 *   Ionic CLI (`npm install -g @ionic/cli`)
 *   Tauri CLI (`npm install -g @tauri-apps/cli`)
+*   mold linker (optional, for faster builds)
 
 ### System Dependencies
 
@@ -82,7 +84,8 @@ sudo apt install -y \
   libsoup-3.0-dev \
   librsvg2-dev \
   patchelf \
-  pkg-config
+  pkg-config \
+  mold
 
 # For Ubuntu:
 sudo apt install -y libappindicator3-dev
@@ -90,6 +93,8 @@ sudo apt install -y libappindicator3-dev
 # For Linux Mint (uses Ayatana fork):
 sudo apt install -y libayatana-appindicator3-dev
 ```
+
+> **Note:** The project is configured to use the `mold` linker for faster Rust compilation. If you don't install mold, remove the `rustflags` line from `netmonitor/.cargo/config.toml`.
 
 #### Installing Rust
 ```bash
