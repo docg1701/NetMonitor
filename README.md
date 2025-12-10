@@ -1,5 +1,9 @@
 # NetMonitor
 
+<p align="center">
+  <img src="icon.svg" alt="NetMonitor Icon" width="128" height="128">
+</p>
+
 ![Latest Release](https://img.shields.io/github/v/release/docg1701/NetMonitor?label=latest%20release)
 
 NetMonitor is a modern, cross-platform network latency monitoring tool designed to be stable, permission-friendly, and easy to use. It provides real-time visualization and statistics for network performance monitoring.
@@ -43,7 +47,7 @@ After building the AppImage or downloading it from Releases, use `install_linux.
 **Installation:**
 ```bash
 chmod +x install_linux.sh
-./install_linux.sh netmonitor/src-tauri/target/release/bundle/appimage/NetMonitor_1.0.0_amd64.AppImage
+./install_linux.sh netmonitor/src-tauri/target/release/bundle/appimage/NetMonitor_1.0.4_amd64.AppImage
 ```
 
 **Uninstallation:**

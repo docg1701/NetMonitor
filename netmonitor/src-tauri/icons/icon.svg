@@ -1,4 +1,47 @@
-<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="1024" height="1024" fill="#007bff"/>
-    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial, sans-serif" font-size="500" fill="white">N</text>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Sombra sutil -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity="0.2"/>
+    </filter>
+    <!-- Glow verde para o indicador -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Fundo azul sólido com cantos arredondados -->
+  <rect width="1024" height="1024" rx="200" fill="#1a73e8"/>
+
+  <!-- Círculo interno (badge style) -->
+  <circle cx="512" cy="480" r="320" fill="rgba(255,255,255,0.1)"/>
+
+  <!-- Letra N usando path -->
+  <path d="M 320 260
+           L 320 700
+           L 400 700
+           L 400 420
+           L 624 700
+           L 704 700
+           L 704 260
+           L 624 260
+           L 624 540
+           L 400 260
+           Z"
+        fill="white"
+        filter="url(#shadow)"/>
+
+  <!-- Três barras de sinal (mais para baixo) -->
+  <rect x="600" y="840" width="80" height="100" rx="12" fill="rgba(255,255,255,0.95)"/>
+  <rect x="700" y="780" width="80" height="160" rx="12" fill="rgba(255,255,255,0.95)"/>
+  <rect x="800" y="720" width="80" height="220" rx="12" fill="rgba(255,255,255,0.95)"/>
+
+  <!-- Indicador de status verde (maior e mais brilhante) -->
+  <circle cx="860" cy="180" r="70" fill="#00c853" filter="url(#glow)"/>
+  <circle cx="860" cy="180" r="50" fill="#00e676"/>
+  <circle cx="845" cy="165" r="15" fill="rgba(255,255,255,0.5)"/>
 </svg>
