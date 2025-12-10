@@ -75,12 +75,13 @@ function install() {
     fi
 
     # Create .desktop file
+    # Note: WEBKIT_DISABLE_COMPOSITING_MODE=1 fixes blank screen on some systems
     cat > "$DESKTOP_FILE" <<EOF
 [Desktop Entry]
 Type=Application
 Name=$APP_NAME
 Comment=$APP_DESCRIPTION
-Exec="$TARGET_APP_IMAGE"
+Exec=env WEBKIT_DISABLE_COMPOSITING_MODE=1 "$TARGET_APP_IMAGE"
 Icon=$ICON_PATH
 Categories=$APP_CATEGORY
 Terminal=false

@@ -21,3 +21,5 @@ latency_log.csv
 tmp/
 temp/
 release-keystore.jks
+release.keystore
+keystore.properties
