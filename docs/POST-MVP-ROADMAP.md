@@ -361,6 +361,23 @@ Monitorando há: 2h 34m 12s
 
 ---
 
+## Privacidade e Dados
+
+**O NetMonitor NÃO coleta, transmite ou utiliza seus dados de nenhuma forma.**
+
+| Aspecto | Garantia |
+|---------|----------|
+| Armazenamento | 100% local no dispositivo do usuário |
+| Transmissão | Nenhum dado é enviado para servidores externos |
+| Telemetria | Zero. Não há analytics ou rastreamento |
+| Uso pelo App | Os dados existem apenas para consulta e exportação pelo usuário |
+
+Os dados pessoais (nome, CPF, endereço) e de monitoramento ficam **exclusivamente** no SQLite local do dispositivo. O único momento em que saem do dispositivo é quando o **próprio usuário** escolhe exportar os arquivos para usar em um chatbot de IA.
+
+> **Nota:** A consulta ao IP público (ipify.org) é a única requisição externa feita pelo app, e serve apenas para registrar o IP no relatório. Nenhum dado pessoal é enviado nessa consulta.
+
+---
+
 ## Documentação Pública
 
 O tutorial de uso com IA e o prompt serão publicados no repositório:
