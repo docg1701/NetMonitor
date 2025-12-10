@@ -215,7 +215,7 @@ Em vez de gerar relatórios PDF complexos no app, exportamos dados estruturados 
 | Nome completo | Input do usuário | Sim |
 | CPF/Documento | Input do usuário | Sim |
 | Endereço | Input do usuário | Sim |
-| Coordenadas GPS | Geolocation API (mobile) | Não |
+| Coordenadas GPS | Geolocation API (todas plataformas) | Não |
 | Nome da operadora | Input do usuário | Sim |
 | Plano contratado | Input do usuário | Sim |
 | Velocidade contratada | Input do usuário | Sim |
@@ -235,17 +235,33 @@ const response = await fetch('https://api.ipify.org?format=json');
 const { ip } = await response.json();
 ```
 
-#### Geolocalização (Mobile)
+#### Geolocalização (Todas as Plataformas)
 
-No Android, solicitar permissão de localização para:
+Solicitar permissão de localização para:
 - Confirmar que o monitoramento é do endereço declarado
 - Adicionar coordenadas GPS ao relatório (prova técnica)
 
+| Plataforma | API | Notas |
+|------------|-----|-------|
+| Android/iOS | `@capacitor/geolocation` | Plugin nativo |
+| Desktop | `navigator.geolocation` | Web API funciona no WebView |
+
 ```typescript
-// Capacitor Geolocation
+// Funciona em TODAS as plataformas (Web Geolocation API)
+navigator.geolocation.getCurrentPosition(
+  (position) => {
+    const { latitude, longitude, accuracy } = position.coords;
+  },
+  (error) => console.error(error),
+  { enableHighAccuracy: true }
+);
+
+// Ou com Capacitor (mobile-first, mas funciona em web)
 import { Geolocation } from '@capacitor/geolocation';
 const position = await Geolocation.getCurrentPosition();
 ```
+
+> **Nota:** No desktop, a precisão depende do Wi-Fi/IP. Em mobile, usa GPS real.
 
 ### Fluxo do Usuário
 
@@ -355,7 +371,6 @@ Monitorando há: 2h 34m 12s
 
 - Widget de status para home screen
 - Histórico visual simples de quedas
-- Temas claro/escuro
 
 ---
 
