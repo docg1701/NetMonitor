@@ -31,6 +31,20 @@ This application is rewritten using Angular, Ionic, Capacitor, and Tauri to ensu
 1.  Download the latest installer/bundle from the [Releases Page](../../releases/latest).
 2.  Install/Run according to your OS (AppImage, .exe/msi, .dmg).
 
+**Linux Helper Script:**
+If you have built the project locally or downloaded the AppImage, you can use the included script to install it to your system menu:
+
+```bash
+# Make script executable
+chmod +x install_linux.sh
+
+# Install (using local build path)
+./install_linux.sh netmonitor/src-tauri/target/release/bundle/appimage/NetMonitor_1.0.0_amd64.AppImage
+
+# Uninstall
+./install_linux.sh --uninstall
+```
+
 ### Android
 1.  Download the latest `.apk` from the Releases page.
 2.  Install on your device.
