@@ -87,10 +87,7 @@ sudo apt install -y \
   pkg-config \
   mold
 
-# For Ubuntu:
-sudo apt install -y libappindicator3-dev
-
-# For Linux Mint (uses Ayatana fork):
+# For system tray support (Ubuntu/Debian/Mint):
 sudo apt install -y libayatana-appindicator3-dev
 ```
 
