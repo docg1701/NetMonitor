@@ -363,9 +363,16 @@ Monitorando há: 2h 34m 12s
 
 ## Documentação Pública
 
-O tutorial de uso com IA e o prompt serão publicados em:
-- `docs/AI-EXPORT-GUIDE.md` - Guia completo de como usar os dados exportados
-- README do repositório - Link para o guia
+O tutorial de uso com IA e o prompt serão publicados no repositório:
+
+| Arquivo | Idioma | Conteúdo |
+|---------|--------|----------|
+| `docs/AI-EXPORT-GUIDE.md` | 🇬🇧 English | Guide for US, EU, UK users |
+| `docs/AI-EXPORT-GUIDE.pt-BR.md` | 🇧🇷 Português | Guia para usuários brasileiros |
+
+O app exporta o tutorial no idioma correspondente ao país selecionado:
+- **Brasil** → Português brasileiro
+- **EUA, UE, UK** → Inglês
 
 Isso permite que usuários consultem as instruções sem precisar exportar dados primeiro.
 
