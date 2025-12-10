@@ -296,8 +296,8 @@ Na tela principal, exibir há quanto tempo o app está monitorando:
 Monitorando há: 2h 34m 12s
 ```
 
-#### Notificação de Queda (Android)
-Enviar notificação push quando a conexão cair, mesmo com app em background.
+> **Nota:** O app só monitora enquanto está em primeiro plano (tela ativa).
+> Não há serviço em background nem notificações push.
 
 ---
 
