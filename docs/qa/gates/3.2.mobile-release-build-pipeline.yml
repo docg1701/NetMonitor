@@ -1,8 +1,0 @@
-schema: 1
-story: '3.2'
-gate: PASS
-status_reason: 'Android release build is fully automated via GitHub Actions with secure signing. iOS manual process is documented. CapacitorHttp fix implemented for Android monitoring.'
-reviewer: 'Quinn'
-updated: '2025-12-09T20:55:00Z'
-top_issues: []
-waiver: { active: false }
