@@ -3,7 +3,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'io.ionic.starter',
   appName: 'netmonitor',
-  webDir: 'www',
+  webDir: 'www/browser',
   resources: {
     android: {
       icon: 'resources/icon.svg'

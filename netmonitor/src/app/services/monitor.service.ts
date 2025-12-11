@@ -1,6 +1,6 @@
-import { Injectable } from '@angular/core';
-import { Observable, from, interval, of, timer, BehaviorSubject, Subscription } from 'rxjs';
-import { switchMap, map, catchError, startWith, distinctUntilChanged } from 'rxjs/operators';
+import { inject, Injectable } from '@angular/core';
+import { Observable, from, of, timer, BehaviorSubject, Subscription } from 'rxjs';
+import { switchMap, map, catchError } from 'rxjs/operators';
 import { TauriService } from './tauri.service';
 import { environment } from '../../environments/environment';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
@@ -10,13 +10,12 @@ import { PingResult } from '../models/ping-result.interface';
   providedIn: 'root'
 })
 export class MonitorService {
+  private readonly tauriService = inject(TauriService);
   private readonly pingUrl = environment.pingUrl || 'https://www.google.com';
   private pollingSubscription: Subscription | null = null;
   private _results$ = new BehaviorSubject<PingResult[]>([]);
-  
-  readonly results$ = this._results$.asObservable();
 
-  constructor(private tauriService: TauriService) {}
+  readonly results$ = this._results$.asObservable();
 
   startMonitoring(intervalMs: number = 2000): void {
     this.stopMonitoring(); // Ensure no duplicate subscriptions
