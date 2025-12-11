@@ -53,8 +53,8 @@ NetMonitor is a **cross-platform network latency monitoring tool** built with:
 | Tauri CLI | 2.9.5 | Desktop builds |
 | Capacitor CLI | 7.4.4 | Mobile builds |
 | ESLint | 9.16.x | Code linting |
-| Karma | 6.4.x | Test runner |
-| Jasmine | 5.1.x | Test framework |
+| Vitest | 3.x | Test framework & runner |
+| Playwright | 1.x | Browser test provider |
 
 ### Planned Additions (Post-MVP)
 

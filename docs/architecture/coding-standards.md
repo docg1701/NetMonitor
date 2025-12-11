@@ -207,10 +207,12 @@ it('works', () => {});
 ### Mocking Platform-Specific APIs
 
 ```typescript
+import { vi } from 'vitest';
+
 // Mock Tauri API
 beforeEach(() => {
   (window as any).__TAURI__ = {
-    invoke: jasmine.createSpy('invoke').and.returnValue(Promise.resolve({ success: true, latency: 50 }))
+    invoke: vi.fn().mockResolvedValue({ success: true, latency: 50 })
   };
 });
 
@@ -218,10 +220,18 @@ afterEach(() => {
   delete (window as any).__TAURI__;
 });
 
-// Mock localStorage
+// Mock localStorage (browser mode requires Storage.prototype)
+let getItemSpy: ReturnType<typeof vi.spyOn>;
+let setItemSpy: ReturnType<typeof vi.spyOn>;
+
 beforeEach(() => {
-  spyOn(localStorage, 'getItem').and.returnValue('dark');
-  spyOn(localStorage, 'setItem');
+  getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockReturnValue('dark');
+  setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {});
+});
+
+afterEach(() => {
+  getItemSpy.mockRestore();
+  setItemSpy.mockRestore();
 });
 ```
 

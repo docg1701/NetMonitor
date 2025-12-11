@@ -168,8 +168,8 @@ NetMonitor is a **cross-platform network latency monitoring tool** built with:
 | Tauri CLI | 2.9.5 | Desktop builds |
 | Capacitor CLI | 7.4.4 | Mobile builds |
 | ESLint | 9.16.x | Code linting |
-| Karma | 6.4.x | Test runner |
-| Jasmine | 5.1.x | Test framework |
+| Vitest | 3.x | Test framework & runner |
+| Playwright | 1.x | Browser test provider |
 
 #### Planned Additions (Post-MVP)
 
@@ -678,7 +678,7 @@ GitHub Actions workflow triggers on version tags (`v*`):
 
 | Type | Tool | Coverage | Files |
 |------|------|----------|-------|
-| Unit Tests | Jasmine/Karma | Minimal | `*.spec.ts` files exist but basic |
+| Unit Tests | Vitest | 80%+ | `*.spec.ts` files with comprehensive coverage |
 | Integration | None | 0% | - |
 | E2E | None | 0% | - |
 
@@ -1063,10 +1063,12 @@ it('works', () => {});
 #### Mocking Platform-Specific APIs
 
 ```typescript
+import { vi } from 'vitest';
+
 // Mock Tauri API
 beforeEach(() => {
   (window as any).__TAURI__ = {
-    invoke: jasmine.createSpy('invoke').and.returnValue(Promise.resolve({ success: true, latency: 50 }))
+    invoke: vi.fn().mockResolvedValue({ success: true, latency: 50 })
   };
 });
 
@@ -1074,10 +1076,18 @@ afterEach(() => {
   delete (window as any).__TAURI__;
 });
 
-// Mock localStorage
+// Mock localStorage (browser mode requires Storage.prototype)
+let getItemSpy: ReturnType<typeof vi.spyOn>;
+let setItemSpy: ReturnType<typeof vi.spyOn>;
+
 beforeEach(() => {
-  spyOn(localStorage, 'getItem').and.returnValue('dark');
-  spyOn(localStorage, 'setItem');
+  getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockReturnValue('dark');
+  setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {});
+});
+
+afterEach(() => {
+  getItemSpy.mockRestore();
+  setItemSpy.mockRestore();
 });
 ```
 

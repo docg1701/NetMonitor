@@ -4,7 +4,7 @@
 
 | Type | Tool | Coverage | Files |
 |------|------|----------|-------|
-| Unit Tests | Jasmine/Karma | Minimal | `*.spec.ts` files exist but basic |
+| Unit Tests | Vitest | 80%+ | `*.spec.ts` files with comprehensive coverage |
 | Integration | None | 0% | - |
 | E2E | None | 0% | - |
 
@@ -34,9 +34,8 @@ Before implementing any enhancement stories, a comprehensive regression test sui
 ## Running Tests
 
 ```bash
-npm test                                           # Runs unit tests in Chrome
-npm test -- --no-watch --browsers=ChromeHeadless   # CI mode
-npm test -- --code-coverage                        # With coverage report
+npm test                    # Runs unit tests with Vitest in Chromium browser
+npx ng test --coverage      # With coverage report
 ```
 
 ## Test Files

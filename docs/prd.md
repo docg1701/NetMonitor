@@ -387,7 +387,7 @@ src/app/
 
 | Test Type | Tool | Focus |
 |-----------|------|-------|
-| Unit Tests | Jasmine/Karma (existing) | Services, components |
+| Unit Tests | Vitest | Services, components |
 | E2E Tests | None currently | Consider adding Playwright for tab navigation |
 | Manual Testing | Device testing | Platform-specific features (SQLite, AdMob) |
 
