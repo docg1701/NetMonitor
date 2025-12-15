@@ -5,12 +5,14 @@ import { TauriService } from './tauri.service';
 import { environment } from '../../environments/environment';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { PingResult } from '../models/ping-result.interface';
+import { PingRepository } from './ping.repository';
 
 @Injectable({
   providedIn: 'root'
 })
 export class MonitorService {
   private readonly tauriService = inject(TauriService);
+  private readonly pingRepository = inject(PingRepository);
   private readonly pingUrl = environment.pingUrl || 'https://www.google.com';
   private pollingSubscription: Subscription | null = null;
   private _results$ = new BehaviorSubject<PingResult[]>([]);
@@ -31,6 +33,8 @@ export class MonitorService {
         // Keep last 50 points
         const updated = [...current, result].slice(-50);
         this._results$.next(updated);
+        // Persist to database (fire-and-forget, non-blocking)
+        this.pingRepository.savePing(result, this.pingUrl);
     });
   }
 

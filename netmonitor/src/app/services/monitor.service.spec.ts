@@ -3,12 +3,14 @@ import type { MockedObject } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { MonitorService } from './monitor.service';
 import { TauriService } from './tauri.service';
+import { PingRepository } from './ping.repository';
 import { Capacitor } from '@capacitor/core';
 import { firstValueFrom } from 'rxjs';
 
 describe('MonitorService', () => {
   let service: MonitorService;
   let tauriServiceSpy: MockedObject<TauriService>;
+  let pingRepositorySpy: { savePing: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -17,10 +19,15 @@ describe('MonitorService', () => {
       invoke: vi.fn().mockName('TauriService.invoke')
     };
 
+    pingRepositorySpy = {
+      savePing: vi.fn().mockResolvedValue(undefined)
+    };
+
     TestBed.configureTestingModule({
       providers: [
         MonitorService,
-        { provide: TauriService, useValue: spy }
+        { provide: TauriService, useValue: spy },
+        { provide: PingRepository, useValue: pingRepositorySpy }
       ]
     });
     service = TestBed.inject(MonitorService);
@@ -194,6 +201,81 @@ describe('MonitorService', () => {
       expect(lastResult.status).toBe('ok');
       expect(lastResult.latencyMs).toBe(123);
       expect(lastResult.timestamp).toBeInstanceOf(Date);
+    });
+  });
+
+  // Persistence integration tests (Story 1.3)
+  describe('persistence integration', () => {
+    it('should emit results via results$ regardless of database state', async () => {
+      (window as any).__TAURI__ = true;
+      tauriServiceSpy.invoke.mockResolvedValue({ latency_ms: 42 });
+      // Simulate database error
+      pingRepositorySpy.savePing.mockRejectedValue(new Error('DB error'));
+
+      service.startMonitoring(1000);
+      await vi.advanceTimersByTimeAsync(100);
+
+      const results = await firstValueFrom(service.results$);
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0].latencyMs).toBe(42);
+    });
+
+    it('should call savePing after each ping result', async () => {
+      (window as any).__TAURI__ = true;
+      tauriServiceSpy.invoke.mockResolvedValue({ latency_ms: 50 });
+
+      service.startMonitoring(100);
+      await vi.advanceTimersByTimeAsync(350);
+
+      // Should have at least 3 calls (initial + 2 intervals)
+      expect(pingRepositorySpy.savePing.mock.calls.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it('should call savePing with correct ping result and target', async () => {
+      (window as any).__TAURI__ = true;
+      tauriServiceSpy.invoke.mockResolvedValue({ latency_ms: 75 });
+
+      service.startMonitoring(1000);
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(pingRepositorySpy.savePing).toHaveBeenCalled();
+      const [result, target] = pingRepositorySpy.savePing.mock.calls[0];
+      expect(result.latencyMs).toBe(75);
+      expect(result.status).toBe('ok');
+      expect(result.timestamp).toBeInstanceOf(Date);
+      expect(target).toBe('https://www.google.com');
+    });
+
+    it('should continue monitoring when database errors occur', async () => {
+      (window as any).__TAURI__ = true;
+      tauriServiceSpy.invoke.mockResolvedValue({ latency_ms: 30 });
+      pingRepositorySpy.savePing.mockRejectedValue(new Error('Database failure'));
+
+      service.startMonitoring(100);
+
+      // Let multiple pings occur
+      await vi.advanceTimersByTimeAsync(350);
+
+      const results = await firstValueFrom(service.results$);
+      // Should have multiple results despite DB errors
+      expect(results.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it('should not block ping timing due to database write', async () => {
+      (window as any).__TAURI__ = true;
+      tauriServiceSpy.invoke.mockResolvedValue({ latency_ms: 20 });
+
+      // Simulate slow database write
+      pingRepositorySpy.savePing.mockImplementation(() =>
+        new Promise(resolve => setTimeout(resolve, 500))
+      );
+
+      service.startMonitoring(100);
+      await vi.advanceTimersByTimeAsync(350);
+
+      // Should have multiple results even though DB is slow
+      const results = await firstValueFrom(service.results$);
+      expect(results.length).toBeGreaterThanOrEqual(3);
     });
   });
 });
