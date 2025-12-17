@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'io.ionic.starter',
-  appName: 'netmonitor',
+  appId: 'com.pixeloddity.netmonitor',
+  appName: 'NetMonitor',
   webDir: 'www/browser',
   resources: {
     android: {

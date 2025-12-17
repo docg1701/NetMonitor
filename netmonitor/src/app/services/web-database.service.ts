@@ -27,4 +27,9 @@ export class WebDatabaseService extends DatabaseService {
   async close(): Promise<void> {
     // No-op for browser
   }
+
+  async executeWithCount(_sql: string, _params?: unknown[]): Promise<number> {
+    console.warn('WebDatabaseService: Database not available in browser - executeWithCount returns 0');
+    return 0;
+  }
 }

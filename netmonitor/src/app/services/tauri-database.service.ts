@@ -68,4 +68,19 @@ export class TauriDatabaseService extends DatabaseService {
       console.error('TauriDatabaseService: Close failed', error);
     }
   }
+
+  async executeWithCount(sql: string, params?: unknown[]): Promise<number> {
+    if (!this.db) {
+      console.warn('TauriDatabaseService: Database not initialized');
+      return 0;
+    }
+
+    try {
+      const result = await this.db.execute(sql, params);
+      return result.rowsAffected;
+    } catch (error) {
+      console.error('TauriDatabaseService: ExecuteWithCount failed', error);
+      throw error;
+    }
+  }
 }

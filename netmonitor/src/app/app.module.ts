@@ -17,6 +17,7 @@ import { CapacitorDatabaseService } from './services/capacitor-database.service'
 import { WebDatabaseService } from './services/web-database.service';
 import { MigrationService } from './services/migration.service';
 import { createV1Migration } from './services/migrations/v1-initial-schema';
+import { CleanupService } from './services/cleanup.service';
 
 export function databaseServiceFactory(): DatabaseService {
   if (isTauri()) {
@@ -33,7 +34,8 @@ export function databaseServiceFactory(): DatabaseService {
 
 export function initializeMigrations(
   db: DatabaseService,
-  migrationService: MigrationService
+  migrationService: MigrationService,
+  cleanupService: CleanupService
 ): () => Promise<void> {
   return async () => {
     console.log('APP_INIT: Starting database initialization...');
@@ -61,6 +63,15 @@ export function initializeMigrations(
     // Run pending migrations
     await migrationService.runMigrations();
     console.log('APP_INIT: Migrations complete');
+
+    // Run data retention cleanup
+    try {
+      await cleanupService.runCleanup();
+      console.log('APP_INIT: Cleanup complete');
+    } catch (e) {
+      console.error('APP_INIT: Cleanup failed:', e);
+      // Don't block app startup on cleanup failure
+    }
   };
 }
 
@@ -73,7 +84,7 @@ export function initializeMigrations(
     {
       provide: APP_INITIALIZER,
       useFactory: initializeMigrations,
-      deps: [DatabaseService, MigrationService],
+      deps: [DatabaseService, MigrationService, CleanupService],
       multi: true
     }
   ],

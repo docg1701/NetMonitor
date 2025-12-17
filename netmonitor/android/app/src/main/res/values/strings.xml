@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">netmonitor</string>
-    <string name="title_activity_main">netmonitor</string>
-    <string name="package_name">io.ionic.starter</string>
-    <string name="custom_url_scheme">io.ionic.starter</string>
+    <string name="app_name">NetMonitor</string>
+    <string name="title_activity_main">NetMonitor</string>
+    <string name="package_name">com.pixeloddity.netmonitor</string>
+    <string name="custom_url_scheme">com.pixeloddity.netmonitor</string>
 </resources>

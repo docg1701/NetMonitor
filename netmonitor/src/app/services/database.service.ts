@@ -43,4 +43,12 @@ export abstract class DatabaseService {
    * Close the database connection.
    */
   abstract close(): Promise<void>;
+
+  /**
+   * Execute INSERT/UPDATE/DELETE statements and return affected row count.
+   * @param sql SQL statement to execute
+   * @param params Optional parameters for prepared statement
+   * @returns Number of rows affected by the operation
+   */
+  abstract executeWithCount(sql: string, params?: unknown[]): Promise<number>;
 }

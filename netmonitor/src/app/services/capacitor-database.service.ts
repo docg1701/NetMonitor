@@ -95,4 +95,19 @@ export class CapacitorDatabaseService extends DatabaseService {
       console.error('CapacitorDatabaseService: Close failed', error);
     }
   }
+
+  async executeWithCount(sql: string, params?: unknown[]): Promise<number> {
+    if (!this.db) {
+      console.warn('CapacitorDatabaseService: Database not initialized');
+      return 0;
+    }
+
+    try {
+      const result = await this.db.run(sql, params as (string | number | boolean | null)[] | undefined);
+      return result.changes?.changes ?? 0;
+    } catch (error) {
+      console.error('CapacitorDatabaseService: ExecuteWithCount failed', error);
+      throw error;
+    }
+  }
 }

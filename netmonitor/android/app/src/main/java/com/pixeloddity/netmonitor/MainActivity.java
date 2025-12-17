@@ -1,4 +1,4 @@
-package io.ionic.starter;
+package com.pixeloddity.netmonitor;
 
 import android.os.Bundle;
 import android.view.WindowManager;
