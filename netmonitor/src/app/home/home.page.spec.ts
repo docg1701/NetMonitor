@@ -12,7 +12,6 @@ describe('HomePage', () => {
     let fixture: ComponentFixture<HomePage>;
     let monitorServiceSpy: Partial<MonitorService>;
     let resultsSubject: BehaviorSubject<PingResult[]>;
-    let mediaQueryListMock: any;
 
     beforeEach(async () => {
         resultsSubject = new BehaviorSubject<PingResult[]>([]);
@@ -21,14 +20,6 @@ describe('HomePage', () => {
             stopMonitoring: vi.fn().mockName("MonitorService.stopMonitoring"),
             results$: resultsSubject.asObservable()
         };
-
-        mediaQueryListMock = {
-            matches: false,
-            addEventListener: vi.fn(),
-            removeEventListener: vi.fn()
-        };
-
-        vi.spyOn(window, 'matchMedia').mockReturnValue(mediaQueryListMock);
 
         await TestBed.configureTestingModule({
             imports: [HomePage, IonicModule.forRoot(), BaseChartDirective],
@@ -211,129 +202,7 @@ describe('HomePage', () => {
         });
     });
 
-    // RT-010: Should toggle theme and persist to localStorage
-    describe('RT-010: Toggle theme and persist to localStorage', () => {
-        let getItemSpy: ReturnType<typeof vi.spyOn>;
-        let setItemSpy: ReturnType<typeof vi.spyOn>;
-
-        beforeEach(() => {
-            getItemSpy = vi.spyOn(Storage.prototype, 'getItem');
-            setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {});
-        });
-
-        afterEach(() => {
-            getItemSpy.mockRestore();
-            setItemSpy.mockRestore();
-            document.body.classList.remove('ion-palette-dark');
-        });
-
-        it('should toggle theme and save to localStorage', () => {
-            getItemSpy.mockReturnValue(null);
-            mediaQueryListMock.matches = false;
-            fixture.detectChanges();
-
-            component.toggleTheme();
-            expect(component.isDark).toBe(true);
-            expect(setItemSpy).toHaveBeenCalledWith('netmonitor-theme', 'dark');
-
-            component.toggleTheme();
-            expect(component.isDark).toBe(false);
-            expect(setItemSpy).toHaveBeenCalledWith('netmonitor-theme', 'light');
-        });
-    });
-
-    // RT-011: Should apply ion-palette-dark class for dark theme
-    describe('RT-011: Apply ion-palette-dark class', () => {
-        let getItemSpy: ReturnType<typeof vi.spyOn>;
-        let setItemSpy: ReturnType<typeof vi.spyOn>;
-
-        beforeEach(() => {
-            getItemSpy = vi.spyOn(Storage.prototype, 'getItem');
-            setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {});
-        });
-
-        afterEach(() => {
-            getItemSpy.mockRestore();
-            setItemSpy.mockRestore();
-            document.body.classList.remove('ion-palette-dark');
-        });
-
-        it('should add ion-palette-dark class when dark theme is active', () => {
-            getItemSpy.mockReturnValue(null);
-            mediaQueryListMock.matches = true; // Dark
-
-            fixture.detectChanges();
-
-            expect(document.body.classList.contains('ion-palette-dark')).toBe(true);
-        });
-
-        it('should remove ion-palette-dark class when light theme is active', () => {
-            getItemSpy.mockReturnValue(null);
-            mediaQueryListMock.matches = false; // Light
-
-            fixture.detectChanges();
-
-            expect(document.body.classList.contains('ion-palette-dark')).toBe(false);
-        });
-    });
-
-    // RT-012: Should load theme preference on init
-    describe('RT-012: Load theme preference on init', () => {
-        let getItemSpy: ReturnType<typeof vi.spyOn>;
-        let setItemSpy: ReturnType<typeof vi.spyOn>;
-
-        beforeEach(() => {
-            getItemSpy = vi.spyOn(Storage.prototype, 'getItem');
-            setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {});
-        });
-
-        afterEach(() => {
-            getItemSpy.mockRestore();
-            setItemSpy.mockRestore();
-            document.body.classList.remove('ion-palette-dark');
-        });
-
-        it('should load saved dark theme from localStorage on init', () => {
-            getItemSpy.mockReturnValue('dark');
-            mediaQueryListMock.matches = false; // System is Light
-
-            fixture.detectChanges();
-
-            expect(component.isDark).toBe(true);
-            expect(document.body.classList.contains('ion-palette-dark')).toBe(true);
-        });
-
-        it('should load saved light theme from localStorage on init', () => {
-            getItemSpy.mockReturnValue('light');
-            mediaQueryListMock.matches = true; // System is Dark
-
-            fixture.detectChanges();
-
-            expect(component.isDark).toBe(false);
-            expect(document.body.classList.contains('ion-palette-dark')).toBe(false);
-        });
-
-        it('should default to system preference if no saved theme', () => {
-            getItemSpy.mockReturnValue(null);
-            mediaQueryListMock.matches = true; // System is Dark
-
-            fixture.detectChanges();
-
-            expect(component.isDark).toBe(true);
-            expect(window.matchMedia).toHaveBeenCalledWith('(prefers-color-scheme: dark)');
-        });
-
-        it('should listen to system preference changes when no user preference', () => {
-            getItemSpy.mockReturnValue(null);
-            mediaQueryListMock.matches = false;
-            fixture.detectChanges();
-
-            // Simulate system change to dark
-            const listener = vi.mocked(mediaQueryListMock.addEventListener).mock.lastCall![1];
-            listener({ matches: true } as MediaQueryListEvent);
-
-            expect(component.isDark).toBe(true);
-            expect(document.body.classList.contains('ion-palette-dark')).toBe(true);
-        });
-    });
+    // NOTE: Theme tests (RT-010, RT-011, RT-012) moved to tabs.page.spec.ts
+    // Theme management was relocated from HomePage to TabsPage as part of the
+    // design change: tabs moved from bottom bar to top toolbar with shared header.
 });

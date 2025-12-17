@@ -1,0 +1,40 @@
+<ion-tabs #tabs (ionTabsDidChange)="onTabsDidChange($event)">
+  <ion-header slot="top" class="ion-no-border">
+    <ion-toolbar>
+      <ion-title slot="start" class="app-title">NetMonitor</ion-title>
+
+      <div slot="end" class="toolbar-content">
+        <ion-segment [value]="selectedTab" (ionChange)="onTabChange($event)" class="nav-segment" mode="ios">
+          <ion-segment-button value="monitor" layout="icon-start">
+            <ion-icon name="pulse-outline"></ion-icon>
+            <ion-label>Monitor</ion-label>
+          </ion-segment-button>
+          <ion-segment-button value="settings" layout="icon-start">
+            <ion-icon name="settings-outline"></ion-icon>
+            <ion-label>Settings</ion-label>
+          </ion-segment-button>
+          <ion-segment-button value="reports" layout="icon-start">
+            <ion-icon name="document-text-outline"></ion-icon>
+            <ion-label>Reports</ion-label>
+          </ion-segment-button>
+        </ion-segment>
+
+        <div class="divider"></div>
+
+        <ion-button (click)="toggleTheme()" fill="clear" size="small" class="theme-toggle">
+          <ion-icon slot="icon-only" [name]="isDark ? 'sunny-outline' : 'moon-outline'"></ion-icon>
+        </ion-button>
+
+        <ion-badge [color]="isMonitoring ? 'success' : 'medium'" class="status-badge">
+          {{ isMonitoring ? 'ONLINE' : 'OFFLINE' }}
+        </ion-badge>
+      </div>
+    </ion-toolbar>
+  </ion-header>
+
+  <ion-tab-bar slot="bottom" style="display: none;">
+    <ion-tab-button tab="monitor"></ion-tab-button>
+    <ion-tab-button tab="settings"></ion-tab-button>
+    <ion-tab-button tab="reports"></ion-tab-button>
+  </ion-tab-bar>
+</ion-tabs>

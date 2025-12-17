@@ -16,11 +16,14 @@ export class MonitorService {
   private readonly pingUrl = environment.pingUrl || 'https://www.google.com';
   private pollingSubscription: Subscription | null = null;
   private _results$ = new BehaviorSubject<PingResult[]>([]);
+  private _isMonitoring$ = new BehaviorSubject<boolean>(false);
 
   readonly results$ = this._results$.asObservable();
+  readonly isMonitoring$ = this._isMonitoring$.asObservable();
 
   startMonitoring(intervalMs: number = 2000): void {
     this.stopMonitoring(); // Ensure no duplicate subscriptions
+    this._isMonitoring$.next(true);
 
     this.pollingSubscription = timer(0, intervalMs).pipe(
       switchMap(() => this.measureLatency()),
@@ -43,6 +46,7 @@ export class MonitorService {
       this.pollingSubscription.unsubscribe();
       this.pollingSubscription = null;
     }
+    this._isMonitoring$.next(false);
   }
 
   private measureLatency(): Observable<PingResult> {

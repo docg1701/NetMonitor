@@ -8,15 +8,31 @@ prd:
   prdShardedLocation: docs/prd
   epicFilePattern: epic-{n}*.md
 architecture:
-  architectureFile: docs/architecture.md
+  architectureFile: docs/architecture/index.md
   architectureVersion: v4
   architectureSharded: true
   architectureShardedLocation: docs/architecture
+  # File mapping: task references -> actual files in this project
+  fileMapping:
+    tech-stack.md: high-level-architecture.md
+    unified-project-structure.md: source-tree-and-module-organization.md
+    frontend-architecture.md: architecture-patterns-and-conventions.md
+    backend-architecture.md: architecture-patterns-and-conventions.md
+    components.md: enhancement-impact-analysis.md
+    core-workflows.md: architecture-patterns-and-conventions.md
+    data-models.md: data-models-and-schema.md
+    database-schema.md: data-models-and-schema.md
+    rest-api-spec.md: integration-points-and-external-dependencies.md
+    external-apis.md: integration-points-and-external-dependencies.md
 customTechnicalDocuments: null
 devLoadAlwaysFiles:
   - docs/architecture/coding-standards.md
   - docs/architecture/high-level-architecture.md
   - docs/architecture/source-tree-and-module-organization.md
+  - docs/architecture/architecture-patterns-and-conventions.md
+  - docs/architecture/data-models-and-schema.md
+  - docs/architecture/testing-strategy.md
+  - docs/architecture/enhancement-impact-analysis.md
 devDebugLog: .ai/debug-log.md
 devStoryLocation: docs/stories
 slashPrefix: BMad

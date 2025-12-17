@@ -2,10 +2,8 @@ import { Component, OnInit, OnDestroy, ViewChild, inject, ChangeDetectorRef } fr
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
-import { addIcons } from 'ionicons';
-import { sunnyOutline, moonOutline } from 'ionicons/icons';
 import { BaseChartDirective } from 'ng2-charts';
-import { ChartConfiguration, ChartOptions, ChartType, Chart, registerables } from 'chart.js';
+import { ChartConfiguration, ChartOptions, Chart, registerables } from 'chart.js';
 import { Subscription } from 'rxjs';
 import { MonitorService } from '../services/monitor.service';
 import { PingResult } from '../models/ping-result.interface';
@@ -27,13 +25,9 @@ export class HomePage implements OnInit, OnDestroy {
   results: PingResult[] = [];
   subscription: Subscription | null = null;
   isMonitoring = false;
-  isDark = false;
-  private themeQuery: MediaQueryList | null = null;
-  private themeListener: ((e: MediaQueryListEvent) => void) | null = null;
+  private themeObserver: MutationObserver | null = null;
 
-  constructor() {
-    addIcons({ sunnyOutline, moonOutline });
-  }
+  constructor() {}
 
   stats = {
     current: 0,
@@ -71,58 +65,34 @@ export class HomePage implements OnInit, OnDestroy {
 
 
   ngOnInit() {
-    this.initializeTheme();
+    this.initializeChartTheme();
+    this.observeThemeChanges();
 
     this.subscription = this.monitorService.results$.subscribe(results => {
       this.results = results;
       this.updateStats(results);
       this.updateChart(results);
-      this.cd.detectChanges(); // Force UI update
+      this.cd.detectChanges();
     });
   }
 
-  private initializeTheme() {
-    this.themeQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    
-    // Define listener
-    this.themeListener = (e: MediaQueryListEvent) => {
-      const savedTheme = localStorage.getItem('netmonitor-theme');
-      if (!savedTheme) {
-        this.setTheme(e.matches);
-      }
-    };
-
-    // Add listener
-    this.themeQuery.addEventListener('change', this.themeListener);
-
-    // Initial check
-    const savedTheme = localStorage.getItem('netmonitor-theme');
-    if (savedTheme) {
-      this.setTheme(savedTheme === 'dark');
-    } else {
-      this.setTheme(this.themeQuery.matches);
-    }
-  }
-
-  private setTheme(isDark: boolean) {
-    this.isDark = isDark;
-    if (this.isDark) {
-      document.body.classList.add('ion-palette-dark');
-    } else {
-      document.body.classList.remove('ion-palette-dark');
-    }
-    
-    // Wait for style application
+  private initializeChartTheme() {
     setTimeout(() => {
-        this.updateChartTheme();
-        this.chart?.update();
+      this.updateChartTheme();
+      this.chart?.update();
     }, 0);
   }
 
-  toggleTheme() {
-    const newIsDark = !this.isDark;
-    this.setTheme(newIsDark);
-    localStorage.setItem('netmonitor-theme', newIsDark ? 'dark' : 'light');
+  private observeThemeChanges() {
+    this.themeObserver = new MutationObserver(() => {
+      this.updateChartTheme();
+      this.chart?.update();
+    });
+
+    this.themeObserver.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
   }
 
   private updateChartTheme() {
@@ -139,8 +109,8 @@ export class HomePage implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    if (this.themeQuery && this.themeListener) {
-      this.themeQuery.removeEventListener('change', this.themeListener);
+    if (this.themeObserver) {
+      this.themeObserver.disconnect();
     }
     if (this.subscription) {
       this.subscription.unsubscribe();
