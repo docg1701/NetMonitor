@@ -4,13 +4,19 @@ import { TestBed } from '@angular/core/testing';
 import { MonitorService } from './monitor.service';
 import { TauriService } from './tauri.service';
 import { PingRepository } from './ping.repository';
+import { SettingsService } from './settings.service';
+import { DEFAULT_SETTINGS, AppSettings } from '../models/settings.interface';
 import { Capacitor } from '@capacitor/core';
-import { firstValueFrom } from 'rxjs';
+import { BehaviorSubject, firstValueFrom } from 'rxjs';
 
 describe('MonitorService', () => {
   let service: MonitorService;
   let tauriServiceSpy: MockedObject<TauriService>;
   let pingRepositorySpy: { savePing: ReturnType<typeof vi.fn> };
+  let settingsServiceSpy: {
+    getCurrentSettings: ReturnType<typeof vi.fn>;
+    settings$: BehaviorSubject<AppSettings>;
+  };
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -23,11 +29,17 @@ describe('MonitorService', () => {
       savePing: vi.fn().mockResolvedValue(undefined)
     };
 
+    settingsServiceSpy = {
+      getCurrentSettings: vi.fn().mockReturnValue(DEFAULT_SETTINGS),
+      settings$: new BehaviorSubject<AppSettings>(DEFAULT_SETTINGS)
+    };
+
     TestBed.configureTestingModule({
       providers: [
         MonitorService,
         { provide: TauriService, useValue: spy },
-        { provide: PingRepository, useValue: pingRepositorySpy }
+        { provide: PingRepository, useValue: pingRepositorySpy },
+        { provide: SettingsService, useValue: settingsServiceSpy }
       ]
     });
     service = TestBed.inject(MonitorService);
@@ -243,7 +255,7 @@ describe('MonitorService', () => {
       expect(result.latencyMs).toBe(75);
       expect(result.status).toBe('ok');
       expect(result.timestamp).toBeInstanceOf(Date);
-      expect(target).toBe('https://www.google.com');
+      expect(target).toBe('8.8.8.8');
     });
 
     it('should continue monitoring when database errors occur', async () => {
@@ -276,6 +288,79 @@ describe('MonitorService', () => {
       // Should have multiple results even though DB is slow
       const results = await firstValueFrom(service.results$);
       expect(results.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  // Settings integration tests (Story 2.1)
+  describe('settings integration', () => {
+    it('should use ping target from settings when available', async () => {
+      (window as any).__TAURI__ = true;
+      const customSettings: AppSettings = {
+        ...DEFAULT_SETTINGS,
+        monitoringConfig: {
+          pingTarget: 'custom.server.com',
+          pingInterval: 10
+        }
+      };
+      settingsServiceSpy.getCurrentSettings.mockReturnValue(customSettings);
+      tauriServiceSpy.invoke.mockResolvedValue({ latency_ms: 50 });
+
+      service.startMonitoring(1000);
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Verify Tauri invoke was called with the custom target
+      expect(tauriServiceSpy.invoke).toHaveBeenCalledWith('ping', { url: 'custom.server.com' });
+
+      // Verify savePing was called with the custom target
+      expect(pingRepositorySpy.savePing).toHaveBeenCalled();
+      const [, target] = pingRepositorySpy.savePing.mock.calls[0];
+      expect(target).toBe('custom.server.com');
+    });
+
+    it('should use ping interval from settings when no override provided', async () => {
+      (window as any).__TAURI__ = true;
+      const customSettings: AppSettings = {
+        ...DEFAULT_SETTINGS,
+        monitoringConfig: {
+          pingTarget: '8.8.8.8',
+          pingInterval: 2  // 2 seconds = 2000ms
+        }
+      };
+      settingsServiceSpy.getCurrentSettings.mockReturnValue(customSettings);
+      tauriServiceSpy.invoke.mockResolvedValue({ latency_ms: 25 });
+
+      // Start monitoring without providing interval (should use settings)
+      service.startMonitoring();
+
+      // Advance by 2500ms - should have 2 calls (initial + 1 interval at 2000ms)
+      await vi.advanceTimersByTimeAsync(2500);
+
+      const results = await firstValueFrom(service.results$);
+      // Should have exactly 2 results with 2000ms interval in 2500ms
+      expect(results.length).toBe(2);
+    });
+
+    it('should override settings interval when custom interval provided', async () => {
+      (window as any).__TAURI__ = true;
+      const customSettings: AppSettings = {
+        ...DEFAULT_SETTINGS,
+        monitoringConfig: {
+          pingTarget: '8.8.8.8',
+          pingInterval: 10  // 10 seconds = 10000ms from settings
+        }
+      };
+      settingsServiceSpy.getCurrentSettings.mockReturnValue(customSettings);
+      tauriServiceSpy.invoke.mockResolvedValue({ latency_ms: 30 });
+
+      // Start monitoring with custom 500ms interval (overrides settings 10s)
+      service.startMonitoring(500);
+
+      // Advance by 1200ms - should have 3 calls with 500ms interval
+      await vi.advanceTimersByTimeAsync(1200);
+
+      const results = await firstValueFrom(service.results$);
+      // Should have 3 results (0ms, 500ms, 1000ms) despite settings saying 10s
+      expect(results.length).toBe(3);
     });
   });
 });
