@@ -2,10 +2,10 @@ import { inject, Injectable } from '@angular/core';
 import { Observable, from, of, timer, BehaviorSubject, Subscription } from 'rxjs';
 import { switchMap, map, catchError } from 'rxjs/operators';
 import { TauriService } from './tauri.service';
-import { environment } from '../../environments/environment';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { PingResult } from '../models/ping-result.interface';
 import { PingRepository } from './ping.repository';
+import { SettingsService } from './settings.service';
 
 @Injectable({
   providedIn: 'root'
@@ -13,7 +13,7 @@ import { PingRepository } from './ping.repository';
 export class MonitorService {
   private readonly tauriService = inject(TauriService);
   private readonly pingRepository = inject(PingRepository);
-  private readonly pingUrl = environment.pingUrl || 'https://www.google.com';
+  private readonly settingsService = inject(SettingsService);
   private pollingSubscription: Subscription | null = null;
   private _results$ = new BehaviorSubject<PingResult[]>([]);
   private _isMonitoring$ = new BehaviorSubject<boolean>(false);
@@ -21,11 +21,27 @@ export class MonitorService {
   readonly results$ = this._results$.asObservable();
   readonly isMonitoring$ = this._isMonitoring$.asObservable();
 
-  startMonitoring(intervalMs: number = 2000): void {
+  /**
+   * Get current ping target from settings.
+   */
+  private get pingTarget(): string {
+    return this.settingsService.getCurrentSettings().monitoringConfig.pingTarget;
+  }
+
+  /**
+   * Get current ping interval in milliseconds from settings.
+   * Settings store interval in seconds, this converts to ms.
+   */
+  private get pingIntervalMs(): number {
+    return this.settingsService.getCurrentSettings().monitoringConfig.pingInterval * 1000;
+  }
+
+  startMonitoring(intervalMs?: number): void {
     this.stopMonitoring(); // Ensure no duplicate subscriptions
     this._isMonitoring$.next(true);
 
-    this.pollingSubscription = timer(0, intervalMs).pipe(
+    const interval = intervalMs ?? this.pingIntervalMs;
+    this.pollingSubscription = timer(0, interval).pipe(
       switchMap(() => this.measureLatency()),
       catchError(err => {
         console.error('Monitoring error:', err);
@@ -37,7 +53,7 @@ export class MonitorService {
         const updated = [...current, result].slice(-50);
         this._results$.next(updated);
         // Persist to database (fire-and-forget, non-blocking)
-        this.pingRepository.savePing(result, this.pingUrl);
+        this.pingRepository.savePing(result, this.pingTarget);
     });
   }
 
@@ -51,7 +67,7 @@ export class MonitorService {
 
   private measureLatency(): Observable<PingResult> {
     if (this.isTauri()) {
-      return from(this.tauriService.invoke<{ latency_ms: number }>('ping', { url: this.pingUrl })).pipe(
+      return from(this.tauriService.invoke<{ latency_ms: number }>('ping', { url: this.pingTarget })).pipe(
         map(res => ({
           latencyMs: res.latency_ms,
           timestamp: new Date(),
@@ -80,11 +96,11 @@ export class MonitorService {
         if (Capacitor.isNativePlatform()) {
             await CapacitorHttp.request({
                 method: 'HEAD',
-                url: this.pingUrl
+                url: this.pingTarget
             });
         } else {
             // Standard Fetch for Web (Development) - might hit CORS if not proxied
-            await fetch(this.pingUrl, { method: 'HEAD', mode: 'no-cors' }); 
+            await fetch(this.pingTarget, { method: 'HEAD', mode: 'no-cors' });
         }
         const end = Date.now();
         return {

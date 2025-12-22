@@ -18,6 +18,7 @@ import { WebDatabaseService } from './services/web-database.service';
 import { MigrationService } from './services/migration.service';
 import { createV1Migration } from './services/migrations/v1-initial-schema';
 import { CleanupService } from './services/cleanup.service';
+import { SettingsService } from './services/settings.service';
 
 export function databaseServiceFactory(): DatabaseService {
   if (isTauri()) {
@@ -35,7 +36,8 @@ export function databaseServiceFactory(): DatabaseService {
 export function initializeMigrations(
   db: DatabaseService,
   migrationService: MigrationService,
-  cleanupService: CleanupService
+  cleanupService: CleanupService,
+  settingsService: SettingsService
 ): () => Promise<void> {
   return async () => {
     console.log('APP_INIT: Starting database initialization...');
@@ -72,6 +74,15 @@ export function initializeMigrations(
       console.error('APP_INIT: Cleanup failed:', e);
       // Don't block app startup on cleanup failure
     }
+
+    // Load settings
+    try {
+      await settingsService.loadSettings();
+      console.log('APP_INIT: Settings loaded');
+    } catch (e) {
+      console.error('APP_INIT: Settings load failed:', e);
+      // Don't block app startup - will use defaults
+    }
   };
 }
 
@@ -84,7 +95,7 @@ export function initializeMigrations(
     {
       provide: APP_INITIALIZER,
       useFactory: initializeMigrations,
-      deps: [DatabaseService, MigrationService, CleanupService],
+      deps: [DatabaseService, MigrationService, CleanupService, SettingsService],
       multi: true
     }
   ],
