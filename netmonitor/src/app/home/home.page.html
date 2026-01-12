@@ -55,6 +55,10 @@
       </ion-row>
     </ion-grid>
 
+    <div class="target-info">
+      <ion-text color="medium">Target: {{ currentTarget }}</ion-text>
+    </div>
+
     <div class="button-container">
       <ion-button (click)="toggleMonitoring()" [color]="isMonitoring ? 'danger' : 'success'">
         {{ isMonitoring ? 'Stop Monitoring' : 'Start Monitoring' }}

@@ -6,6 +6,7 @@ import { BaseChartDirective } from 'ng2-charts';
 import { ChartConfiguration, ChartOptions, Chart, registerables } from 'chart.js';
 import { Subscription } from 'rxjs';
 import { MonitorService } from '../services/monitor.service';
+import { SettingsService } from '../services/settings.service';
 import { PingResult } from '../models/ping-result.interface';
 
 Chart.register(...registerables);
@@ -21,11 +22,14 @@ export class HomePage implements OnInit, OnDestroy {
   @ViewChild(BaseChartDirective) chart?: BaseChartDirective;
 
   monitorService = inject(MonitorService);
+  settingsService = inject(SettingsService);
   cd = inject(ChangeDetectorRef);
   results: PingResult[] = [];
   subscription: Subscription | null = null;
   isMonitoring = false;
+  currentTarget = '';
   private themeObserver: MutationObserver | null = null;
+  private settingsSubscription: Subscription | null = null;
 
   constructor() {}
 
@@ -65,6 +69,12 @@ export class HomePage implements OnInit, OnDestroy {
 
 
   ngOnInit() {
+    // Initialize current target from current settings immediately
+    const currentSettings = this.settingsService.getCurrentSettings();
+    if (currentSettings) {
+      this.currentTarget = currentSettings.monitoringConfig.pingTarget;
+    }
+
     this.initializeChartTheme();
     this.observeThemeChanges();
 
@@ -72,6 +82,11 @@ export class HomePage implements OnInit, OnDestroy {
       this.results = results;
       this.updateStats(results);
       this.updateChart(results);
+      this.cd.detectChanges();
+    });
+
+    this.settingsSubscription = this.settingsService.settings$.subscribe(settings => {
+      this.currentTarget = settings.monitoringConfig.pingTarget;
       this.cd.detectChanges();
     });
   }
@@ -115,6 +130,9 @@ export class HomePage implements OnInit, OnDestroy {
     if (this.subscription) {
       this.subscription.unsubscribe();
     }
+    if (this.settingsSubscription) {
+      this.settingsSubscription.unsubscribe();
+    }
     this.stopMonitoring();
   }
 
@@ -128,7 +146,7 @@ export class HomePage implements OnInit, OnDestroy {
 
   startMonitoring() {
     this.isMonitoring = true;
-    this.monitorService.startMonitoring(1000); // Default 1s interval
+    this.monitorService.startMonitoring(); // Uses interval from settings
   }
 
   stopMonitoring() {

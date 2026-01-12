@@ -2,8 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HomePage } from './home.page';
 import { MonitorService } from '../services/monitor.service';
+import { SettingsService } from '../services/settings.service';
 import { BehaviorSubject } from 'rxjs';
 import { PingResult } from '../models/ping-result.interface';
+import { AppSettings, DEFAULT_SETTINGS } from '../models/settings.interface';
 import { BaseChartDirective } from 'ng2-charts';
 import { IonicModule } from '@ionic/angular';
 
@@ -11,20 +13,30 @@ describe('HomePage', () => {
     let component: HomePage;
     let fixture: ComponentFixture<HomePage>;
     let monitorServiceSpy: Partial<MonitorService>;
+    let settingsServiceSpy: Partial<SettingsService>;
     let resultsSubject: BehaviorSubject<PingResult[]>;
+    let settingsSubject: BehaviorSubject<AppSettings>;
 
     beforeEach(async () => {
         resultsSubject = new BehaviorSubject<PingResult[]>([]);
+        settingsSubject = new BehaviorSubject<AppSettings>(DEFAULT_SETTINGS);
+
         monitorServiceSpy = {
             startMonitoring: vi.fn().mockName("MonitorService.startMonitoring"),
             stopMonitoring: vi.fn().mockName("MonitorService.stopMonitoring"),
             results$: resultsSubject.asObservable()
         };
 
+        settingsServiceSpy = {
+            settings$: settingsSubject.asObservable(),
+            getCurrentSettings: () => DEFAULT_SETTINGS
+        };
+
         await TestBed.configureTestingModule({
             imports: [HomePage, IonicModule.forRoot(), BaseChartDirective],
             providers: [
-                { provide: MonitorService, useValue: monitorServiceSpy }
+                { provide: MonitorService, useValue: monitorServiceSpy },
+                { provide: SettingsService, useValue: settingsServiceSpy }
             ]
         }).compileComponents();
 

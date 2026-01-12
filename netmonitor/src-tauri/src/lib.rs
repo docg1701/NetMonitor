@@ -8,43 +8,46 @@ struct AppState {
 #[derive(serde::Serialize)]
 pub struct PingResult {
     pub success: bool,
-    pub latency: u64,
+    pub latency_ms: u64,
 }
 
-// Hardcoded allowed domain for security (QA requirement)
-const ALLOWED_DOMAIN: &str = "www.google.com";
+// Whitelist of allowed ping targets (IPs and domains)
+const ALLOWED_TARGETS: [&str; 6] = [
+    "8.8.8.8",
+    "1.1.1.1",
+    "9.9.9.9",
+    "208.67.222.222",
+    "www.google.com",
+    "www.cloudflare.com"
+];
 
 #[tauri::command]
 async fn ping(url: String, state: State<'_, AppState>) -> Result<PingResult, String> {
-    // Security Check: Validate that the requested URL matches the allowed domain
-    if !url.contains(ALLOWED_DOMAIN) {
-        return Err(format!("Security Violation: URL must target {}", ALLOWED_DOMAIN));
+    // Security Check: Validate that the requested URL is in the whitelist
+    if !ALLOWED_TARGETS.contains(&url.as_str()) {
+        return Err(format!("Target '{}' not in whitelist", url));
     }
+
+    // Construct full URL with https scheme
+    let full_url = format!("https://{}", url);
 
     let start = Instant::now();
     // Use the shared client from AppState
-    let response = state.client.head(&url).send().await;
-    let latency = start.elapsed().as_millis() as u64;
+    let response = state.client.head(&full_url).send().await;
+    let latency_ms = start.elapsed().as_millis() as u64;
 
     match response {
         Ok(resp) => {
-             if resp.status().is_success() {
-                 Ok(PingResult {
-                     success: true,
-                     latency,
-                 })
-             } else {
-                  Ok(PingResult {
-                     success: true,
-                     latency,
-                 })
-             }
+            Ok(PingResult {
+                success: resp.status().is_success(),
+                latency_ms,
+            })
         }
         Err(_e) => {
-             Ok(PingResult {
-                 success: false,
-                 latency: 0,
-             })
+            Ok(PingResult {
+                success: false,
+                latency_ms: 0,
+            })
         }
     }
 }
@@ -61,8 +64,14 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![ping])
     .setup(|app| {
       // Initialize the reqwest client once and manage it in AppState
+      // Force HTTP/1 only and disable all connection pooling/reuse
+      // to ensure each ping measures full connection latency (DNS + TCP + TLS + HTTP)
       let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(5))
+        .http1_only()
+        .pool_max_idle_per_host(0)
+        .pool_idle_timeout(std::time::Duration::ZERO)
+        .tcp_keepalive(None)
         .build()
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
