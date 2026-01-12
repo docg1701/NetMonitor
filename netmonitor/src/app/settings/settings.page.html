@@ -1,3 +1,50 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Settings</ion-title>
+  </ion-toolbar>
+</ion-header>
+
 <ion-content class="ion-padding">
-  <p>Settings page - Coming soon</p>
+  <ion-list>
+    <ion-list-header>
+      <ion-label>Monitoring Configuration</ion-label>
+    </ion-list-header>
+
+    <ion-item>
+      <ion-select
+        label="Ping Target"
+        labelPlacement="stacked"
+        [(ngModel)]="selectedTarget"
+        (ionChange)="onTargetChange($event.detail.value)"
+      >
+        @for (opt of pingTargetOptions; track opt.value) {
+          <ion-select-option [value]="opt.value">
+            {{ opt.label }}
+          </ion-select-option>
+        }
+      </ion-select>
+    </ion-item>
+
+    <ion-item>
+      <ion-input
+        label="Ping Interval (seconds)"
+        labelPlacement="stacked"
+        type="number"
+        min="1"
+        max="60"
+        [(ngModel)]="pingInterval"
+        (ionBlur)="onIntervalChange(pingInterval)"
+      ></ion-input>
+    </ion-item>
+
+    <ion-note class="ion-padding-horizontal ion-padding-top">
+      Valid range: 1-60 seconds
+    </ion-note>
+  </ion-list>
+
+  <div class="button-container">
+    <ion-button color="medium" (click)="restoreDefaults()">
+      Restore Defaults
+    </ion-button>
+  </div>
 </ion-content>
